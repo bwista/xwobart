@@ -40,3 +40,22 @@ def coverage_gaps(season: int, min_date: str, max_date: str, window: tuple[str, 
     if max_date < window[1]:
         gaps.append(f"{season}: cache ends {max_date}, season ends {window[1]}")
     return gaps
+
+
+def merge_sprint_speed(bbe: pl.DataFrame, sprint: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Left-join seasonal sprint speed by (batter, season); impute the league median
+    for that season where missing, flag with imputed_speed, report the rate."""
+    med = sprint.group_by("season").agg(league_median=pl.col("sprint_speed").median())
+    out = (
+        bbe.join(sprint, left_on=["batter", "game_year"], right_on=["player_id", "season"], how="left")
+        .join(med, left_on="game_year", right_on="season", how="left")
+        .with_columns(imputed_speed=pl.col("sprint_speed").is_null())
+        .with_columns(sprint_speed=pl.coalesce("sprint_speed", "league_median"))
+        .drop("league_median")
+    )
+    rate = (
+        out.group_by("game_year")
+        .agg(imputation_rate=pl.col("imputed_speed").mean())
+        .sort("game_year")
+    )
+    return out, rate

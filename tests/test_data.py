@@ -32,3 +32,32 @@ def test_retry_raises_after_exhaustion():
 
     with pytest.raises(ConnectionError):
         _retry(always, tries=2, wait_s=0)
+
+
+import polars as pl
+
+from src.data import merge_sprint_speed
+
+
+def test_sprint_merge_and_median_imputation():
+    bbe = pl.DataFrame({"batter": [10, 20, 30], "game_year": [2024, 2024, 2024]})
+    sprint = pl.DataFrame({
+        "player_id": [10, 40, 50], "season": [2024, 2024, 2024],
+        "sprint_speed": [30.0, 26.0, 28.0],
+    })
+    out, rate = merge_sprint_speed(bbe, sprint)
+    row = {b: (s, i) for b, s, i in zip(out["batter"], out["sprint_speed"], out["imputed_speed"])}
+    assert row[10] == (30.0, False)          # matched
+    assert row[20] == (28.0, True)           # imputed to league median (median of 30,26,28)
+    assert row[30] == (28.0, True)
+    assert abs(rate["imputation_rate"][0] - 2 / 3) < 1e-9
+
+
+def test_sprint_merge_is_per_season():
+    bbe = pl.DataFrame({"batter": [10, 10], "game_year": [2023, 2024]})
+    sprint = pl.DataFrame({
+        "player_id": [10, 10], "season": [2023, 2024],
+        "sprint_speed": [29.0, 27.0],
+    })
+    out, _ = merge_sprint_speed(bbe, sprint)
+    assert out.sort("game_year")["sprint_speed"].to_list() == [29.0, 27.0]
