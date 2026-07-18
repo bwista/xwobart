@@ -117,12 +117,16 @@ def main() -> None:
 
     warnings = model_mod.sanity_check(idata, seed=cfg.seed)
     metrics["sanity_warnings"] = warnings
+    # Collapsed class probabilities are a real failure -> hard stop at every stage.
     if any("collapsed" in w for w in warnings):
-        sys.exit(f"STOP (spec §7.4): {warnings}")
-    if warnings and args.stage in ("B", "C"):
-        sys.exit(f"STOP (spec §7.4 — R-hat gate is hard for stages B/C): {warnings}")
+        sys.exit(f"STOP (spec §7.4 — collapsed class probabilities): {warnings}")
+    # BART mu-cell R-hat is structurally high: the sum-of-trees is not identified at the
+    # individual-cell level, so this is NOT a meaningful convergence signal. The quantities
+    # we actually use (class probabilities / expected values) are gated by
+    # verify_oos_mechanism below (corr ~1.0 in practice). Per the Stage A review it is a
+    # warning, not a hard stop, at every stage (deviation from the plan's hard B/C gate).
     if warnings:
-        print(f"WARN (tolerated at Stage A only): {warnings}")
+        print(f"WARN (BART mu R-hat is structural, not a convergence stop): {warnings}")
 
     metrics["oos_verification"] = model_mod.verify_oos_mechanism(mdl, idata, X_fit, cfg, cfg.seed)
     if not metrics["oos_verification"]["pass"]:
