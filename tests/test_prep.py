@@ -71,3 +71,31 @@ def test_non_bbe_pa_table():
     assert out.height == 2
     assert out.columns == ["batter", "season", "woba_value", "woba_denom"]
     assert out["woba_value"].to_list() == [0.0, 0.7]
+
+
+from src.prep import stratified_subsample
+
+
+def _imbalanced(n=10_000):
+    # ~66% out, 21% single, 8% double, 0.7% triple, 4.3% HR — roughly real proportions
+    counts = {0: 6600, 1: 2100, 2: 800, 3: 70, 4: 430}
+    rows = [c for c, k in counts.items() for _ in range(k)]
+    return pl.DataFrame({"outcome_class": rows, "payload": list(range(len(rows)))})
+
+
+def test_subsample_preserves_proportions_and_size():
+    df = _imbalanced()
+    sub = stratified_subsample(df, 1000, seed=42)
+    assert sub.height == 1000
+    got = dict(sub.group_by("outcome_class").len().iter_rows())
+    assert got[3] in (6, 7, 8)            # triples survive, proportionally (~7)
+    assert abs(got[0] - 660) <= 2         # never rebalanced
+
+
+def test_subsample_reproducible_and_noop_when_large():
+    df = _imbalanced()
+    a = stratified_subsample(df, 500, seed=1)["payload"].to_list()
+    b = stratified_subsample(df, 500, seed=1)["payload"].to_list()
+    assert a == b
+    assert stratified_subsample(df, 10_000_000, seed=1).height == df.height
+    assert stratified_subsample(df, None, seed=1).height == df.height

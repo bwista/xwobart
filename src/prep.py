@@ -66,3 +66,26 @@ def build_non_bbe_pa(df: pl.DataFrame) -> pl.DataFrame:
             woba_denom=pl.col("woba_denom"),
         )
     )
+
+
+def stratified_subsample(df: pl.DataFrame, n: int | None, seed: int) -> pl.DataFrame:
+    """Proportional (largest-remainder) subsample by outcome_class. Preserves class
+    proportions so triples survive; NEVER rebalances (calibration is a gate — the
+    mlb-hit-classifier resampling study showed rebalancing distorts probabilities)."""
+    if n is None or n >= df.height:
+        return df
+    counts = dict(df.group_by("outcome_class").len().iter_rows())
+    shares = {c: cnt * n / df.height for c, cnt in counts.items()}
+    alloc = {c: int(s) for c, s in shares.items()}
+    remainder = n - sum(alloc.values())
+    # Secondary key = class index so ties break deterministically: polars group_by is
+    # NOT order-stable, so a tie on the fractional part must not depend on row order.
+    for c, _ in sorted(shares.items(), key=lambda kv: (-(kv[1] - int(kv[1])), kv[0]))[:remainder]:
+        alloc[c] += 1
+    alloc = {c: min(k, counts[c]) for c, k in alloc.items()}
+    parts = [
+        df.filter(pl.col("outcome_class") == c).sample(n=k, seed=seed + int(c), shuffle=True)
+        for c, k in sorted(alloc.items())
+        if k > 0
+    ]
+    return pl.concat(parts).sample(fraction=1.0, seed=seed, shuffle=True)
