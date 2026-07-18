@@ -46,3 +46,23 @@ def class_distribution(df: pl.DataFrame) -> pl.DataFrame:
         df.group_by("outcome_class").len().sort("outcome_class")
         .with_columns(pct=(100 * pl.col("len") / df.height))
     )
+
+
+def build_features(bbe: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Exactly three features, float64; no standardization (BART does not need it)."""
+    X = bbe.select(FEATURES).to_numpy().astype(np.float64)
+    y = bbe["outcome_class"].to_numpy().astype(np.int64)
+    return X, y
+
+
+def build_non_bbe_pa(df: pl.DataFrame) -> pl.DataFrame:
+    """Walks, HBP, strikeouts, catcher's interference: woba_denom == 1 and type != 'X'."""
+    return (
+        df.filter((pl.col("woba_denom") == 1) & (pl.col("type") != "X"))
+        .select(
+            "batter",
+            season=pl.col("game_year"),
+            woba_value=pl.col("woba_value"),
+            woba_denom=pl.col("woba_denom"),
+        )
+    )

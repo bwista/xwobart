@@ -38,3 +38,36 @@ def test_class_distribution_sums_to_100():
     dist = class_distribution(df)
     assert abs(dist["pct"].sum() - 100.0) < 1e-6
     assert dist.filter(pl.col("outcome_class") == 1)["len"].item() == 3
+
+
+import numpy as np
+
+from src.prep import FEATURES, build_features, build_non_bbe_pa
+
+
+def test_build_features_exact_three_columns():
+    df = pl.DataFrame({
+        "launch_speed": [90.0, 100.0], "launch_angle": [10.0, 25.0],
+        "sprint_speed": [27.0, 29.5], "outcome_class": [0, 4],
+        "extra": ["a", "b"],
+    })
+    X, y = build_features(df)
+    assert X.shape == (2, 3) and X.dtype == np.float64
+    assert FEATURES == ["launch_speed", "launch_angle", "sprint_speed"]
+    assert y.tolist() == [0, 4] and y.dtype == np.int64
+    assert X[1, 2] == 29.5
+
+
+def test_non_bbe_pa_table():
+    df = pl.DataFrame({
+        "batter":     [1, 1, 2, 3],
+        "game_year":  [2024, 2024, 2024, 2024],
+        "type":       ["S", "X", "B", "S"],
+        "woba_value": [0.0, 0.9, 0.7, None],
+        "woba_denom": [1, 1, 1, None],
+    })
+    out = build_non_bbe_pa(df)
+    # row 0: K (kept). row 1: type X (excluded). row 2: walk (kept). row 3: null denom (excluded).
+    assert out.height == 2
+    assert out.columns == ["batter", "season", "woba_value", "woba_denom"]
+    assert out["woba_value"].to_list() == [0.0, 0.7]
