@@ -68,6 +68,20 @@
   little undercorrection to shrink; the localization check is the cleaner evidence that
   the model captures the speed effect.
 
+## Post-v0 benchmark — is v0 more accurate than Savant? (parity)
+
+Canonical xwOBA-validity test (no re-fit; `scripts/benchmark_vs_savant.py`,
+`results/benchmark/`): does year-T xwOBA predict year-(T+1) **actual** wOBA better?
+1,058 player-pairs (100+ PA both years), pooled Pearson r vs next-season wOBA —
+v0 model **0.481**, Savant **0.487**, naive last-year wOBA 0.390. Paired bootstrap
+`r_model − r_savant = −0.006`, 95% CI [−0.025, +0.013] → **statistical parity;
+v0 does not beat Savant** (both clearly beat the naive baseline, so v0 is genuine
+xwOBA). The 3-feature model is at Savant's information ceiling — beating Savant
+requires inputs Savant lacks (→ v1 spray + handedness). **v1 target: pooled r > 0.487
+vs next-season actual wOBA with a gap-CI excluding 0.** See `results/benchmark/NOTES.md`.
+The per-player credible intervals are honest but do NOT shrink with PA (Task A,
+`results/task_a/`) — they track surface uncertainty, not sample size.
+
 ## Stage C decision (spec §15.3)
 
 From Stage B (14.2 min on 50k rows), full-train (~363k rows) extrapolates to ~100 min
