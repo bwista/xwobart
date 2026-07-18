@@ -255,7 +255,14 @@ collapse, stop and report — do not paper over it.
    `season`, `PA` (= Σ `woba_denom`), posterior mean, sd, 5th and 95th
    percentiles, and public Savant xwOBA (`est_woba`) joined on for
    comparison. Train seasons use in-sample predictions; the holdout season
-   uses out-of-sample predictions.
+   uses out-of-sample predictions. Ids the KIT resolver cannot resolve fall
+   back to the raw id string (`mapping.get(batter_id, str(batter_id))` — the
+   resolver omits unresolved ids rather than raising).
+
+Note: BBE rows dropped for missing `launch_speed`/`launch_angle` (§6.2)
+vanish from both the rollup numerator and denominator, while public xwOBA
+retains those PA (Savant imputes). This ~0.5%-of-PA discrepancy is expected
+background noise in the §9.1 player-level comparison, not a bug.
 
 ## 9. Acceptance checks (`src/evaluate.py`)
 
@@ -272,12 +279,17 @@ The four v0 gates. Each produces a figure or table under
   Scatter plot.
 - Mean residual against binned EV and binned LA (not just the single
   correlation) to expose structure.
+- Ballpark expectation: event-level r on train should land roughly ≥0.95.
+  Materially lower signals a pipeline bug (bad join, class-index
+  misalignment), not a modeling finding — investigate before reporting.
 
 ### 9.2 Calibration
 
 On the 2025 holdout: one reliability curve per outcome class using 10
-quantile bins of predicted probability; per-class Brier score; expected
-calibration error. Near-empty bins (triples) are handled gracefully: collapse
+quantile bins of predicted probability; per-class Brier score; per-class
+expected calibration error computed from those same 10 bins, plus their
+class-frequency-weighted aggregate. Near-empty bins (triples) are handled
+gracefully: collapse
 duplicate quantile edges, annotate bin counts, never divide by zero.
 
 ### 9.3 Sprint speed localization
