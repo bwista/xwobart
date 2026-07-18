@@ -1,0 +1,72 @@
+{
+  "min_pa": 100,
+  "n_player_seasons": 1829,
+  "median_pa": 363.0,
+  "median_width": 0.05771285049662095,
+  "width_vs_pa_loglog": {
+    "n": 1829,
+    "slope": 0.04861484800998626,
+    "slope_ci95": [
+      0.03828039864271895,
+      0.05870558540904013
+    ],
+    "intercept": -3.1296884396802302,
+    "r2": 0.04571719199485902
+  },
+  "width_bin_medians": [
+    {
+      "pa_lo": 100,
+      "pa_hi": 150,
+      "n": 220,
+      "pa_mid": 121.0,
+      "median_width": 0.05636081450742471
+    },
+    {
+      "pa_lo": 150,
+      "pa_hi": 200,
+      "n": 189,
+      "pa_mid": 173.0,
+      "median_width": 0.05663768254179774
+    },
+    {
+      "pa_lo": 200,
+      "pa_hi": 300,
+      "n": 308,
+      "pa_mid": 247.0,
+      "median_width": 0.05693067091715165
+    },
+    {
+      "pa_lo": 300,
+      "pa_hi": 400,
+      "n": 306,
+      "pa_mid": 346.0,
+      "median_width": 0.05744262116341116
+    },
+    {
+      "pa_lo": 400,
+      "pa_hi": 500,
+      "n": 288,
+      "pa_mid": 447.0,
+      "median_width": 0.057400053362640924
+    },
+    {
+      "pa_lo": 500,
+      "pa_hi": 750,
+      "n": 518,
+      "pa_mid": 595.5,
+      "median_width": 0.06004934330107761
+    }
+  ],
+  "width_r_pa": 0.22327063000877986,
+  "width_r_xwoba_mean": 0.39326310130342984,
+  "savant_in_ci90_fraction": 0.9442318206670312,
+  "player_r_all_seasons": 0.9481746169958523,
+  "tail_compression": {
+    "model_vs_savant_slope": 0.8087723680396529,
+    "diff_vs_savant_slope": -0.19122763196034662,
+    "diff_vs_savant_intercept": 0.06802489171442744
+  },
+  "diff_mean_bias": 0.008925516340447298,
+  "diff_mean_abs": 0.012526279783189815,
+  "diff_p95_abs": 0.028399488191727607
+}
