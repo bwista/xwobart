@@ -116,3 +116,50 @@ def build_season_caches(cfg: Config, force: bool = False) -> dict[int, Path]:
 def load_seasons(cfg: Config, seasons: list[int]) -> pl.DataFrame:
     paths = build_season_caches(cfg)
     return pl.concat([pl.read_parquet(paths[y]) for y in seasons])
+
+
+def fetch_sprint_speed(cfg: Config, force: bool = False) -> pl.DataFrame:
+    """Seasonal sprint speed per player (min_opp qualifier), one cached parquet per
+    season. Returns columns: player_id, season, sprint_speed."""
+    frames = []
+    for year in cfg.all_seasons:
+        cache = cfg.raw_dir / f"sprint_speed-{year}.parquet"
+        if cache.exists() and not force:
+            frames.append(pl.read_parquet(cache))
+            continue
+        from pybaseball import statcast_sprint_speed
+
+        pdf = _retry(lambda: statcast_sprint_speed(year, cfg.sprint_min_opp))
+        df = pl.from_pandas(pdf)
+        id_col = "player_id" if "player_id" in df.columns else "id"
+        out = df.select(
+            player_id=pl.col(id_col).cast(pl.Int64),
+            sprint_speed=pl.col("sprint_speed").cast(pl.Float64),
+        ).with_columns(season=pl.lit(year, dtype=pl.Int64))
+        out.write_parquet(cache)
+        frames.append(out)
+    return pl.concat(frames)
+
+
+def fetch_expected_stats(cfg: Config, force: bool = False) -> pl.DataFrame:
+    """Public seasonal expected stats for the player-level replication check.
+    minPA=25 (well under the 100-PA evaluation gate). Returns: player_id, season,
+    pa, est_woba."""
+    frames = []
+    for year in cfg.all_seasons:
+        cache = cfg.raw_dir / f"expected_stats-{year}.parquet"
+        if cache.exists() and not force:
+            frames.append(pl.read_parquet(cache))
+            continue
+        from pybaseball import statcast_batter_expected_stats
+
+        pdf = _retry(lambda: statcast_batter_expected_stats(year, 25))
+        df = pl.from_pandas(pdf)
+        out = df.select(
+            player_id=pl.col("player_id").cast(pl.Int64),
+            pa=pl.col("pa").cast(pl.Int64),
+            est_woba=pl.col("est_woba").cast(pl.Float64),
+        ).with_columns(season=pl.lit(year, dtype=pl.Int64))
+        out.write_parquet(cache)
+        frames.append(out)
+    return pl.concat(frames)
