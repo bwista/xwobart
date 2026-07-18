@@ -207,8 +207,13 @@ def variable_importance(figdir: Path, model, idata, X: np.ndarray) -> dict:
         fig.savefig(figdir / "variable_importance.png", dpi=120)
         plt.close(fig)
         labels = ["launch_speed", "launch_angle", "sprint_speed"]
+        # Keep only small summary fields. compute_variable_importance also returns large
+        # per-event `preds`/`preds_all` arrays (for plotting) that bloat metrics.json to
+        # ~100s of MB — never serialize those.
+        keep = {"indices", "labels", "r2_mean", "r2_hdi"}
         return {"method": "pymc_bart.compute_variable_importance",
+                "feature_labels": labels,
                 "raw": {k: np.asarray(v).tolist() for k, v in vi.items()
-                        if isinstance(v, (list, np.ndarray))} or {"labels": labels}}
+                        if k in keep and isinstance(v, (list, np.ndarray))}}
     except Exception as exc:
         return {"unavailable": f"{type(exc).__name__}: {exc}"}
