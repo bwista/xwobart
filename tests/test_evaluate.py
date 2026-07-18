@@ -65,3 +65,15 @@ def test_undercorrection_directional():
     m = undercorrection(actual, model_pred, public_pred, sprint)
     assert m["public_residual_sprint_corr"] > 0.5
     assert abs(m["model_residual_sprint_corr"]) < 0.1
+
+
+from src.evaluate import contact_grids
+
+
+def test_contact_grids():
+    s, X_g, X_b = contact_grids((23.0, 31.0, 5))
+    assert s.tolist() == [23.0, 25.0, 27.0, 29.0, 31.0]
+    assert X_g.shape == (5, 3) and X_b.shape == (5, 3)
+    assert np.all(X_g[:, 0] == 85.0) and np.all(X_g[:, 1] == -10.0)
+    assert np.all(X_b[:, 0] == 103.0) and np.all(X_b[:, 1] == 28.0)
+    assert np.all(X_g[:, 2] == s)

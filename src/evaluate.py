@@ -156,3 +156,59 @@ def undercorrection(actual: np.ndarray, model_pred: np.ndarray, public_pred: np.
         "model_residual_sprint_corr": pearson(actual - model_pred, sprint),
         "public_residual_sprint_corr": pearson(actual - public_pred, sprint),
     }
+
+
+def contact_grids(grid_cfg: tuple[float, float, int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fixed contact points crossed with a sprint-speed grid (spec §9.3):
+    topped grounder (85, -10) and barrel (103, 28)."""
+    lo, hi, n = grid_cfg
+    s = np.linspace(lo, hi, int(n))
+    grounder = np.column_stack([np.full(int(n), 85.0), np.full(int(n), -10.0), s])
+    barrel = np.column_stack([np.full(int(n), 103.0), np.full(int(n), 28.0), s])
+    return s, grounder, barrel
+
+
+def localization(figdir: Path, s: np.ndarray, grounder_ev: np.ndarray, barrel_ev: np.ndarray,
+                 sprint_hold: np.ndarray, codes_hold: np.ndarray, ev_mean_hold: np.ndarray) -> dict:
+    """grounder_ev / barrel_ev are (S, len(s)) per-draw expected values on the grids."""
+    out: dict = {}
+    fig, ax = plt.subplots(figsize=(7, 5))
+    for name, evd, color in (("topped grounder (85, -10)", grounder_ev, "C0"),
+                             ("barrel (103, 28)", barrel_ev, "C1")):
+        mean = evd.mean(axis=0)
+        q05, q95 = np.quantile(evd, [0.05, 0.95], axis=0)
+        ax.plot(s, mean, color=color, label=name)
+        ax.fill_between(s, q05, q95, color=color, alpha=0.2)
+        slope = float(np.polyfit(s, mean, 1)[0])
+        out[("grounder" if "grounder" in name else "barrel") + "_slope_per_ftps"] = slope
+    ax.set_xlabel("sprint speed (ft/s)"); ax.set_ylabel("expected wOBA value")
+    ax.legend(); ax.set_title("sprint-speed localization (90% credible bands)")
+    fig.savefig(figdir / "sprint_localization_curves.png", dpi=120)
+    plt.close(fig)
+
+    for label, codes in (("weak_topped", (1, 2)), ("solid_barrel", (5, 6))):
+        m = np.isin(codes_hold, codes) & np.isfinite(sprint_hold) & np.isfinite(ev_mean_hold)
+        out[f"{label}_sprint_corr"] = pearson(ev_mean_hold[m], sprint_hold[m])
+        out[f"{label}_sprint_slope"] = float(np.polyfit(sprint_hold[m], ev_mean_hold[m], 1)[0])
+        out[f"{label}_n"] = int(m.sum())
+    return out
+
+
+def variable_importance(figdir: Path, model, idata, X: np.ndarray) -> dict:
+    """pymc-bart variable importance for the three features. The API has moved between
+    versions — adapt the call to the installed version if it raises; metrics tolerate
+    an 'unavailable' record but Stage B should ship real numbers (spec §9.3)."""
+    try:
+        import pymc_bart as pmb
+
+        vi = pmb.compute_variable_importance(idata, model["mu"], X)
+        axes = pmb.plot_variable_importance(vi)
+        fig = (axes[0] if isinstance(axes, (list, np.ndarray)) else axes).figure
+        fig.savefig(figdir / "variable_importance.png", dpi=120)
+        plt.close(fig)
+        labels = ["launch_speed", "launch_angle", "sprint_speed"]
+        return {"method": "pymc_bart.compute_variable_importance",
+                "raw": {k: np.asarray(v).tolist() for k, v in vi.items()
+                        if isinstance(v, (list, np.ndarray))} or {"labels": labels}}
+    except Exception as exc:
+        return {"unavailable": f"{type(exc).__name__}: {exc}"}
