@@ -76,3 +76,97 @@ def thin(idata, max_total_draws: int):
 def save_idata(idata, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     idata.to_netcdf(str(path))
+
+
+def predict_mu(model, idata, X_new: np.ndarray, seed: int) -> np.ndarray:
+    """Documented pm.set_data + sample_posterior_predictive path (spec §7.3).
+
+    NON-FUNCTIONAL for OOS in pymc-bart 0.12.0: because mu is declared with the static
+    shape (K, n_train), set_data does not resample it — sample_posterior_predictive
+    emits ImplicitFreezeWarning and returns the frozen in-sample trace of shape
+    (K, n_train) regardless of X_new (a wrong answer, not an exception). Kept for
+    reference; predict_mu_any uses the stored-trees predictor instead."""
+    import pymc as pm
+
+    with model:
+        pm.set_data({"X_data": X_new})
+        pp = pm.sample_posterior_predictive(
+            idata, var_names=["mu"], random_seed=seed, progressbar=False
+        )
+    vals = pp.posterior_predictive["mu"].values     # (chains, draws, K, n_new)
+    return vals.reshape(-1, *vals.shape[2:])
+
+
+def predict_mu_from_trees(model, idata, X_new: np.ndarray, seed: int) -> np.ndarray:
+    """Fallback: sample the fitted trees directly. pymc_bart.utils._sample_posterior
+    returns (S, n_new, K) in the installed version (0.12.0), so transpose to the
+    (S, K, n_new) convention model.py uses everywhere."""
+    from pymc_bart.utils import _sample_posterior
+
+    all_trees = model["mu"].owner.op.all_trees
+    rng = np.random.default_rng(seed)
+    S = idata.posterior.sizes["chain"] * idata.posterior.sizes["draw"]
+    out = np.asarray(_sample_posterior(all_trees, X=X_new, rng=rng, size=S, shape=K))
+    return out.transpose(0, 2, 1)
+
+
+def predict_mu_any(model, idata, X_new: np.ndarray, seed: int) -> np.ndarray:
+    """OOS prediction. The pm.set_data path silently freezes mu in pymc-bart 0.12.0
+    (see predict_mu), so predict directly from the stored trees — the spec §7.3
+    sanctioned fallback, validated by the smoke and by verify_oos_mechanism at
+    corr ~1.0 against the in-sample posterior."""
+    return predict_mu_from_trees(model, idata, X_new, seed)
+
+
+@dataclass
+class PredictBundle:
+    """Bounded-memory reductions of the posterior predictive (spec §7.2/§8.2)."""
+    p_mean: np.ndarray            # (n, K) float32 — posterior-mean class probabilities
+    ev_draws: np.ndarray          # (S, n) float32 — expected wOBA value per draw
+    lppd_i: np.ndarray | None     # (n,) log( mean_s p[y_i] ) — None when y unknown
+    meanlog_i: np.ndarray | None  # (n,) mean_s log p[y_i]
+
+
+def predict_and_reduce(model, idata, X_new: np.ndarray, y_new: np.ndarray | None,
+                       w: np.ndarray, cfg: Config, seed: int) -> PredictBundle:
+    """Chunked prediction; keeps only bounded reductions, never the full (S, n, K)."""
+    from scipy.special import logsumexp
+
+    from src.rollup import expected_values
+
+    idt = thin(idata, cfg.thin_draws)
+    n = X_new.shape[0]
+    p_mean = np.zeros((n, K), dtype=np.float64)
+    ev_parts, lp_parts, ml_parts = [], [], []
+    for lo in range(0, n, cfg.chunk_size):
+        hi = min(lo + cfg.chunk_size, n)
+        mu = predict_mu_any(model, idt, X_new[lo:hi], seed)    # (S, K, c)
+        p = _softmax(mu, axis=1)
+        p_mean[lo:hi] = p.mean(axis=0).T
+        ev_parts.append(expected_values(p, w))                 # (S, c) f32
+        if y_new is not None:
+            yc = y_new[lo:hi]
+            py = np.clip(p[:, yc, np.arange(hi - lo)], 1e-12, None)   # (S, c)
+            lp_parts.append(logsumexp(np.log(py), axis=0) - np.log(p.shape[0]))
+            ml_parts.append(np.log(py).mean(axis=0))
+    return PredictBundle(
+        p_mean=p_mean.astype(np.float32),
+        ev_draws=np.concatenate(ev_parts, axis=1),
+        lppd_i=np.concatenate(lp_parts) if lp_parts else None,
+        meanlog_i=np.concatenate(ml_parts) if ml_parts else None,
+    )
+
+
+def verify_oos_mechanism(model, idata, X_train: np.ndarray, cfg: Config, seed: int) -> dict:
+    """Predict training rows via the OOS path; posterior-mean probs must agree with
+    the in-sample posterior (spec §7.3 verification gate)."""
+    idt = thin(idata, min(200, cfg.thin_draws))
+    take = min(2000, X_train.shape[0])
+    mu_new = predict_mu_any(model, idt, X_train[:take], seed)
+    p_new = _softmax(mu_new, axis=1).mean(axis=0).T                       # (take, K)
+    mu_in = idt.posterior["mu"].values
+    mu_in = mu_in.reshape(-1, K, mu_in.shape[-1])[:, :, :take]
+    p_in = _softmax(mu_in, axis=1).mean(axis=0).T
+    r = float(np.corrcoef(p_new.ravel(), p_in.ravel())[0, 1])
+    max_abs = float(np.abs(p_new - p_in).max())
+    return {"corr": r, "max_abs_diff": max_abs, "pass": bool(r > 0.99 and max_abs < 0.05)}
