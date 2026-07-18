@@ -373,6 +373,7 @@ integration test):
 | ELPD primary = lppd (log-of-mean); mean-of-log also stored | lppd is the standard ELPD estimator; both kept for transparency |
 | Repo/project named `xwobart` at repo root | User decision |
 | Coverage gaps documented, not pulled (2022 Oct 1–5, 2023 Oct 1) | User chose local-cache-only; fill path via KIT documented in §5.2 |
+| Slim caches store `game_date` as a `YYYY-MM-DD` string, not a Date column | Lexicographic comparison is equivalent for the window checks; sidesteps the cache's mixed date32/string dtypes |
 
 ## 15. Definition of done (v0)
 
