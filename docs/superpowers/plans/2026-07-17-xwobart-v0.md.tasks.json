@@ -19,8 +19,8 @@
     {"id": 24, "planTask": 15, "subject": "Task 15: Evaluate — sprint localization and variable importance", "status": "completed", "blockedBy": [23]},
     {"id": 25, "planTask": 16, "subject": "Task 16: Orchestrator run_v0.py", "status": "completed", "blockedBy": [24]},
     {"id": 26, "planTask": 17, "subject": "Task 17: Stage A wiring run (GATE)", "status": "completed", "blockedBy": [25]},
-    {"id": 27, "planTask": 18, "subject": "Task 18: README and requirements.lock", "status": "pending", "blockedBy": [26]},
-    {"id": 28, "planTask": 19, "subject": "Task 19: Stage B/C runs and reviews (GATES)", "status": "pending", "blockedBy": [27]}
+    {"id": 27, "planTask": 18, "subject": "Task 18: README and requirements.lock", "status": "completed", "blockedBy": [26]},
+    {"id": 28, "planTask": 19, "subject": "Task 19: Stage B/C runs and reviews (GATES)", "status": "completed", "blockedBy": [27]}
   ],
   "lastUpdated": "2026-07-18"
 }
