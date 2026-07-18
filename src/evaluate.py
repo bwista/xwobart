@@ -80,3 +80,79 @@ def elpd_metrics(lppd_i: np.ndarray, meanlog_i: np.ndarray) -> dict:
         "mean_log_lik_sum": float(meanlog_i.sum()),
         "n_events": int(n),
     }
+
+
+def binned_residuals(model_val: np.ndarray, public_val: np.ndarray, x: np.ndarray,
+                     lo: float, hi: float, width: float) -> list[dict]:
+    """Mean (model - public) residual per x-bin — exposes structure a single r hides."""
+    out = []
+    edges = np.arange(lo, hi + width, width)
+    res = model_val - public_val
+    for a, b in zip(edges[:-1], edges[1:]):
+        m = (x >= a) & (x < b) & np.isfinite(res)
+        if m.sum() >= 25:
+            out.append({"bin_lo": float(a), "bin_hi": float(b),
+                        "mean_residual": float(res[m].mean()), "n": int(m.sum())})
+    return out
+
+
+def replication(figdir: Path, *, ev_mean_train, public_train, ev_mean_hold, public_hold,
+                ls_hold, la_hold, player_table: pl.DataFrame, min_pa: int,
+                train_seasons: list[int], seed: int) -> dict:
+    out = {
+        "event_r_train": pearson(ev_mean_train, public_train),
+        "event_r_holdout": pearson(ev_mean_hold, public_hold),
+    }
+    rng = np.random.default_rng(seed)
+    for tag, mv, pv in (("train", ev_mean_train, public_train),
+                        ("holdout", ev_mean_hold, public_hold)):
+        m = np.isfinite(mv) & np.isfinite(pv)
+        idx = np.flatnonzero(m)
+        idx = rng.choice(idx, size=min(20_000, len(idx)), replace=False)
+        fig, ax = plt.subplots(figsize=(6, 6))
+        ax.scatter(pv[idx], mv[idx], s=3, alpha=0.15)
+        ax.plot([0, 2.1], [0, 2.1], "--", color="grey", lw=1)
+        ax.set_xlabel("estimated_woba_using_speedangle (Savant)")
+        ax.set_ylabel("posterior-mean expected value (model)")
+        ax.set_title(f"event-level replication — {tag} (r={out[f'event_r_{tag}']:.3f})")
+        fig.savefig(figdir / f"replication_event_{tag}.png", dpi=120)
+        plt.close(fig)
+
+    pt = player_table.filter(pl.col("PA") >= min_pa).drop_nulls("xwoba_savant")
+    tr = pt.filter(pl.col("season").is_in(train_seasons))
+    ho = pt.filter(~pl.col("season").is_in(train_seasons))
+    out["player_r_train"] = pearson(tr["xwoba_mean"].to_numpy(), tr["xwoba_savant"].to_numpy())
+    out["player_r_holdout"] = pearson(ho["xwoba_mean"].to_numpy(), ho["xwoba_savant"].to_numpy())
+    out["players_train"], out["players_holdout"] = tr.height, ho.height
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.scatter(tr["xwoba_savant"], tr["xwoba_mean"], s=8, alpha=0.4, label=f"train (r={out['player_r_train']:.3f})")
+    ax.scatter(ho["xwoba_savant"], ho["xwoba_mean"], s=8, alpha=0.4, label=f"holdout (r={out['player_r_holdout']:.3f})")
+    ax.plot([0.2, 0.5], [0.2, 0.5], "--", color="grey", lw=1)
+    ax.set_xlabel("public xwOBA (Savant)"); ax.set_ylabel("rollup posterior mean")
+    ax.legend(); ax.set_title(f"player-season replication ({min_pa}+ PA)")
+    fig.savefig(figdir / "replication_player.png", dpi=120)
+    plt.close(fig)
+
+    out["residual_by_ev"] = binned_residuals(ev_mean_hold, public_hold, ls_hold, 40, 120, 2.5)
+    out["residual_by_la"] = binned_residuals(ev_mean_hold, public_hold, la_hold, -75, 75, 5)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    for ax, key, lab in ((axes[0], "residual_by_ev", "launch_speed (mph)"),
+                         (axes[1], "residual_by_la", "launch_angle (deg)")):
+        rows = out[key]
+        ax.axhline(0, color="grey", lw=1)
+        ax.plot([r["bin_lo"] for r in rows], [r["mean_residual"] for r in rows], "o-")
+        ax.set_xlabel(lab); ax.set_ylabel("mean(model - public)")
+    fig.suptitle("holdout residual structure vs EV / LA bins")
+    fig.savefig(figdir / "replication_residual_bins.png", dpi=120)
+    plt.close(fig)
+    return out
+
+
+def undercorrection(actual: np.ndarray, model_pred: np.ndarray, public_pred: np.ndarray,
+                    sprint: np.ndarray) -> dict:
+    """Spec §9.4: on ground balls, residual-vs-sprint correlation, model vs public.
+    The public metric undercorrects for speed; the model should shrink toward zero."""
+    return {
+        "model_residual_sprint_corr": pearson(actual - model_pred, sprint),
+        "public_residual_sprint_corr": pearson(actual - public_pred, sprint),
+    }
