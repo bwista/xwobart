@@ -75,3 +75,29 @@ def eb_shrink(raw: np.ndarray, se2: np.ndarray, mu: float, tau2: float):
     post_var = rel * se2                      # = tau2*se2/(tau2+se2); 0 when tau2==0
     half = Z90 * np.sqrt(post_var)
     return theta, post_var, theta - half, theta + half, rel
+
+
+def build_talent_table(pav: pl.DataFrame, fit_min_pa: int = 100) -> pl.DataFrame:
+    """Per (batter, season): raw xwOBA, EB true-talent estimate, 90% interval, and
+    reliability. EB hyperparameters (mu, tau2) are fit per season on players with
+    PA >= fit_min_pa, then applied to all player-seasons. Single-PA seasons have no
+    sampling SD (se2 null) and are dropped — they carry no estimable uncertainty."""
+    raw = per_player_raw(pav).filter(pl.col("se2").is_not_null())
+    out = []
+    for season in raw["season"].unique().sort().to_list():
+        s = raw.filter(pl.col("season") == season)
+        fit = s.filter(pl.col("PA") >= fit_min_pa)
+        mu, tau2 = eb_fit(fit["xwoba_raw"].to_numpy(), fit["se2"].to_numpy())
+        theta, pv, lo, hi, rel = eb_shrink(
+            s["xwoba_raw"].to_numpy(), s["se2"].to_numpy(), mu, tau2
+        )
+        out.append(s.with_columns(
+            xwoba_talent=pl.Series(theta),
+            talent_post_var=pl.Series(pv),
+            talent_lo=pl.Series(lo),
+            talent_hi=pl.Series(hi),
+            reliability=pl.Series(rel),
+            mu_season=pl.lit(mu),
+            tau_season=pl.lit(float(np.sqrt(tau2))),
+        ))
+    return pl.concat(out).sort("batter", "season")

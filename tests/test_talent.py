@@ -1,7 +1,13 @@
 import numpy as np
 import polars as pl
 
-from src.talent import build_pa_values, eb_fit, eb_shrink, per_player_raw
+from src.talent import (
+    build_pa_values,
+    build_talent_table,
+    eb_fit,
+    eb_shrink,
+    per_player_raw,
+)
 
 
 def _pitches():
@@ -70,3 +76,33 @@ def test_eb_shrink_edge_zero_tau():
     # No between-player spread -> full shrink to mu, degenerate interval floored, not NaN.
     theta, pv, lo, hi, rel = eb_shrink(np.array([0.5]), np.array([0.01]), 0.32, 0.0)
     assert theta[0] == 0.32 and rel[0] == 0.0 and np.isfinite(lo[0]) and np.isfinite(hi[0])
+
+
+def test_build_talent_table_per_season_and_small_samples_shrink_more():
+    rng = np.random.default_rng(1)
+    rows = []
+    for season, lg in ((2023, 0.33), (2024, 0.31)):
+        for batter in range(300):
+            pa = int(rng.integers(50, 650))
+            theta = rng.normal(lg, 0.045)
+            vals = rng.normal(theta, 0.9, pa)            # per-PA values, high variance
+            for v in vals:
+                rows.append({"batter": batter, "game_year": season,
+                             "type": "X", "estimated_woba_using_speedangle": v,
+                             "woba_value": v, "woba_denom": 1})
+    pav = build_pa_values(pl.DataFrame(rows))
+    tbl = build_talent_table(pav, fit_min_pa=100)
+    assert {"batter", "season", "PA", "xwoba_raw", "xwoba_talent",
+            "talent_lo", "talent_hi", "reliability", "mu_season"}.issubset(tbl.columns)
+    # per-season mu differs and is near the simulated league levels
+    mus = dict(tbl.group_by("season").agg(pl.col("mu_season").first()).iter_rows())
+    assert abs(mus[2023] - 0.33) < 0.02 and abs(mus[2024] - 0.31) < 0.02
+    # low-PA players are shrunk harder (reliability rises with PA)
+    lo = tbl.filter(pl.col("PA") < 120)["reliability"].mean()
+    hi = tbl.filter(pl.col("PA") > 500)["reliability"].mean()
+    assert hi > lo
+    # talent estimate lies between raw and its season mean (shrinkage direction)
+    s = tbl.filter(pl.col("PA") < 120)
+    pulled = ((s["xwoba_talent"] - s["mu_season"]).abs()
+              <= (s["xwoba_raw"] - s["mu_season"]).abs() + 1e-9).all()
+    assert pulled
