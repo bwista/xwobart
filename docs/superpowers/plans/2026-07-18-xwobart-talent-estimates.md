@@ -544,28 +544,16 @@ git commit -m "docs: empirical-Bayes talent estimates — results and validation
 
 ---
 
-## Phase 2 — BART-informed hierarchical model (LATER; separate spec→plan→execute cycle)
+## Phase 2 — BART-informed contact-quality prior (LATER; own cycle)
 
-> **Do not start Phase 2 inside this plan.** It requires a modeling decision and one BART re-fit, so it should be run as its own brainstorm→spec→plan→execute cycle (like v0). This section is the roadmap and the decisions to make, not bite-sized tasks.
-
-**Why.** Phase 1 shrinks every player toward the *league mean*. That is wrong for a hitter whose *contact quality* says more than their small sample: a rookie with 80 PA of barrels should regress toward a barrel-hitter's xwOBA, not toward league average. Phase 2 replaces the flat prior mean with a **BART contact-quality prediction**, so the player's own PAs update a contact-informed prior. This is the job that finally gives the BART model a clear, defensible role (Phase 1 is model-agnostic; v0's posterior interval was the wrong object).
-
-**Prerequisite (blocks everything in Phase 2):** persist **per-event model expected values** during a fit. The fitted BART trees are not saved in `idata.nc` (only in `model["mu"].owner.op.all_trees` in memory), so the model's per-BBE EVs cannot be recovered without a re-fit. Add an option to `scripts/run_v0.py` / `src/model.py` to write per-event `ev_mean` (holdout **and** train) to `results/stage_C/event_ev.parquet` keyed by (batter, season, event index). One re-fit of Stage C (~27 min) covers it.
-
-**Design decision to settle in the Phase-2 brainstorm — two variants:**
-
-1. **Two-stage (recommended first; cheaper, reuses v0).**
-   - Stage 1: prior mean `m_i` = the player-season's **contact-implied xwOBA** = mean of the model's per-event EVs over their BBE + the deterministic non-BBE values (from the persisted `event_ev.parquet`).
-   - Stage 2: hierarchical shrink of the raw xwOBA toward `m_i` (not the league mean): `θ̂_i = m_i + reliability_i·(raw_i − m_i)`, with between-player residual variance `τ_resid²` estimated by the same EB machinery on `(raw_i − m_i)`. Reuses all of `src.talent`.
-   - Validation: should beat Phase-1 league-mean EB **specifically for players whose contact quality diverges from their small-sample results** (e.g. a hitter barreling the ball with unlucky outcomes over 100 PA).
-
-2. **Full event-level hierarchical BART (heaviest; most principled).**
-   - Add a **batter random intercept** to the latent categorical model in `src/model.py`: `mu = BART(contact features) + b_batter`, `b_batter ~ N(0, σ_b²)`. The model gains player identity and does partial pooling internally; per-player posteriors come straight out of the fit.
-   - Cost: a genuinely new, larger fit (thousands of batter effects); needs its own runtime/memory gate like v0's Stage C decision. Only pursue if the two-stage variant proves the concept and the extra coherence is judged worth the fit cost.
-
-**Combined interval (either variant).** Report the fullest interval as `width ≈ √(talent_var + surface_var)` — the Phase-1/Phase-2 estimation (talent) variance plus BART's surface posterior variance (the flat ≈0.056 term from v0). Sampling/estimation dominates at low PA; the BART surface term dominates at high PA. This is where v0's posterior finally contributes legitimately instead of masquerading as the whole band.
-
-**Phase-2 definition of done (mirrors v0 §15):** the two-stage contact-prior estimate beats Phase-1 league-mean EB on next-season wOBA for the low-PA / contact-diverges subset (or a clear reason why not); `event_ev.parquet` persisted and documented; the combined-interval construction implemented and its calibration checked (does the interval contain next-season wOBA at the nominal 90%?); `results/RESULTS.md` updated with the model-comparison table; all unit tests green.
+Phase 2 is now tracked in its own roadmap file:
+**[`2026-07-18-xwobart-phase2-bart-prior.md`](./2026-07-18-xwobart-phase2-bart-prior.md)**.
+It replaces the flat league-mean prior with a BART contact-quality prediction (so a good-contact /
+low-PA hitter regresses toward their contact-implied xwOBA, not league average) and folds BART's
+surface term into a combined interval. It requires a modeling decision and one BART re-fit, so it
+runs as its own brainstorm → spec → plan → execute cycle; the prerequisite is persisting per-event
+model EVs (`results/stage_C/event_ev.parquet`). See that file for the two design variants, the
+combined-interval construction, and the Phase-2 definition of done.
 
 ---
 
