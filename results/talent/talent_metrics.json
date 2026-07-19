@@ -1,0 +1,255 @@
+{
+  "n_player_seasons": 2636,
+  "per_season": [
+    {
+      "season": 2022,
+      "n": 678,
+      "mu": 0.3045735794619145,
+      "tau": 0.031200686339770016,
+      "median_reliability": 0.6445727320632717
+    },
+    {
+      "season": 2023,
+      "n": 647,
+      "mu": 0.3142191454933654,
+      "tau": 0.03077336511839634,
+      "median_reliability": 0.6432568203056792
+    },
+    {
+      "season": 2024,
+      "n": 645,
+      "mu": 0.31034268007596433,
+      "tau": 0.030707642571468425,
+      "median_reliability": 0.6537482359508247
+    },
+    {
+      "season": 2025,
+      "n": 666,
+      "mu": 0.31786958057853504,
+      "tau": 0.03230790880043775,
+      "median_reliability": 0.6478801821639445
+    }
+  ],
+  "biggest_shrinks": [
+    {
+      "player_name": "Khalil Lee",
+      "season": 2022,
+      "PA": 2,
+      "xwoba_raw": 0.911,
+      "xwoba_talent": 0.3053579226706596,
+      "reliability": 0.0012933856147777192
+    },
+    {
+      "player_name": "Stone Garrett",
+      "season": 2024,
+      "PA": 6,
+      "xwoba_raw": 0.8006666666666667,
+      "xwoba_talent": 0.3168279849711951,
+      "reliability": 0.01322657074218228
+    },
+    {
+      "player_name": "Tristan Gray",
+      "season": 2023,
+      "PA": 4,
+      "xwoba_raw": 0.7045,
+      "xwoba_talent": 0.3174238899672033,
+      "reliability": 0.008211380181303298
+    },
+    {
+      "player_name": "Zack Collins",
+      "season": 2023,
+      "PA": 6,
+      "xwoba_raw": 0.5291666666666667,
+      "xwoba_talent": 0.32095024286858614,
+      "reliability": 0.03131507327220488
+    },
+    {
+      "player_name": "Grant Koch",
+      "season": 2024,
+      "PA": 8,
+      "xwoba_raw": 0.09025,
+      "xwoba_talent": 0.28603512420311134,
+      "reliability": 0.1104423639371527
+    },
+    {
+      "player_name": "Jeter Downs",
+      "season": 2023,
+      "PA": 9,
+      "xwoba_raw": 0.5306666666666666,
+      "xwoba_talent": 0.335146551427577,
+      "reliability": 0.09668581936522073
+    },
+    {
+      "player_name": "Tyler Gentry",
+      "season": 2024,
+      "PA": 5,
+      "xwoba_raw": 0.08180000000000001,
+      "xwoba_talent": 0.2772458850402237,
+      "reliability": 0.14481669255274213
+    },
+    {
+      "player_name": "Aramis Garcia",
+      "season": 2025,
+      "PA": 4,
+      "xwoba_raw": 0.0545,
+      "xwoba_talent": 0.24938379752869033,
+      "reliability": 0.26003680037536725
+    },
+    {
+      "player_name": "Brewer Hicklen",
+      "season": 2024,
+      "PA": 5,
+      "xwoba_raw": 0.05500000000000001,
+      "xwoba_talent": 0.24966217933133023,
+      "reliability": 0.23764339250524694
+    },
+    {
+      "player_name": "Chadwick Tromp",
+      "season": 2022,
+      "PA": 4,
+      "xwoba_raw": 0.50325,
+      "xwoba_talent": 0.30937192879359293,
+      "reliability": 0.024151579330263868
+    },
+    {
+      "player_name": "C.J. Stubbs",
+      "season": 2025,
+      "PA": 3,
+      "xwoba_raw": 0.08966666666666667,
+      "xwoba_talent": 0.27999163825596207,
+      "reliability": 0.16598360499989662
+    },
+    {
+      "player_name": "Caleb Hamilton",
+      "season": 2023,
+      "PA": 6,
+      "xwoba_raw": 0.11666666666666665,
+      "xwoba_talent": 0.3013684263202399,
+      "reliability": 0.06504964781737134
+    },
+    {
+      "player_name": "Reiver Sanmartin",
+      "season": 2022,
+      "PA": 2,
+      "xwoba_raw": 0.05,
+      "xwoba_talent": 0.23322645602595837,
+      "reliability": 0.28026130436143704
+    },
+    {
+      "player_name": "Ronnie Dawson",
+      "season": 2022,
+      "PA": 3,
+      "xwoba_raw": 0.107,
+      "xwoba_talent": 0.28909080604625,
+      "reliability": 0.07836459438469133
+    },
+    {
+      "player_name": "Adam Engel",
+      "season": 2023,
+      "PA": 6,
+      "xwoba_raw": 0.06833333333333333,
+      "xwoba_talent": 0.249400276585827,
+      "reliability": 0.26361370075859336
+    }
+  ],
+  "validation": {
+    "note": "Pooled r is the instrument for shrinkage benefit; per-band r is affine-invariant to shrinkage and noise-dominated (see by_band).",
+    "n_pairs": 1060,
+    "pooled_pa_min": {
+      "pa_t_floor": 100,
+      "n": 1060,
+      "xwoba_talent": {
+        "r": 0.4885949663907888,
+        "rmse_calibrated": 0.03451161401984015
+      },
+      "xwoba_raw": {
+        "r": 0.48350704557307783,
+        "rmse_calibrated": 0.03462354291826487
+      },
+      "xwoba_savant": {
+        "r": 0.490753743274318,
+        "rmse_calibrated": 0.03446365826983307
+      },
+      "talent_beats_raw": true,
+      "talent_beats_savant": false
+    },
+    "pooled_lowpa_inclusive": {
+      "pa_t_floor": 30,
+      "n": 1173,
+      "xwoba_talent": {
+        "r": 0.4668922111971062
+      },
+      "xwoba_raw": {
+        "r": 0.4454082319283189
+      },
+      "xwoba_savant": {
+        "r": 0.4521325806273593
+      },
+      "talent_beats_raw": true,
+      "talent_beats_savant": true
+    },
+    "by_band": [
+      {
+        "band": "[30,60)",
+        "n": 50,
+        "median_reliability": 0.2731828165738527,
+        "mean_abs_talent_minus_raw": 0.04089778923136943,
+        "xwoba_talent": {
+          "r": 0.23892878394381523
+        },
+        "xwoba_raw": {
+          "r": 0.20876814688577539
+        },
+        "xwoba_savant": {
+          "r": 0.21113865062163895
+        }
+      },
+      {
+        "band": "[60,100)",
+        "n": 63,
+        "median_reliability": 0.3894097773129311,
+        "mean_abs_talent_minus_raw": 0.018558191461825448,
+        "xwoba_talent": {
+          "r": 0.08820506519141412
+        },
+        "xwoba_raw": {
+          "r": 0.1102350470007558
+        },
+        "xwoba_savant": {
+          "r": 0.12826281613295276
+        }
+      },
+      {
+        "band": "[100,250)",
+        "n": 227,
+        "median_reliability": 0.5747673073127699,
+        "mean_abs_talent_minus_raw": 0.012975358810003765,
+        "xwoba_talent": {
+          "r": 0.2768657371046178
+        },
+        "xwoba_raw": {
+          "r": 0.27831854675521916
+        },
+        "xwoba_savant": {
+          "r": 0.2930753165632143
+        }
+      },
+      {
+        "band": "[250,inf)",
+        "n": 833,
+        "median_reliability": 0.7697258538581657,
+        "mean_abs_talent_minus_raw": 0.006884778140124296,
+        "xwoba_talent": {
+          "r": 0.5122430002579208
+        },
+        "xwoba_raw": {
+          "r": 0.5164171447767119
+        },
+        "xwoba_savant": {
+          "r": 0.5230171796022732
+        }
+      }
+    ],
+    "beats_savant_pooled": false
+  }
+}

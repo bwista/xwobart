@@ -97,6 +97,34 @@ the bootstrap sampling term (dominant at low PA) plus BART's surface posterior (
 dominant at high PA), which is the one piece BART uniquely supplies. See
 `results/player_ci/NOTES.md`.
 
+## Talent estimates (empirical Bayes) — true-talent xwOBA + calibrated interval
+
+The object for *analyzing a hitter* (not just banding the raw number): a per-batter-season
+xwOBA regressed for sample size, with an interval that narrows with PA. Gaussian–Gaussian
+empirical Bayes over quantities we already have (`src/talent.py`, `scripts/run_talent.py`,
+`results/talent/`, no re-fit): `θ̂ = μ + reliability·(raw − μ)`,
+`reliability = τ²/(τ²+se²)`, 90% interval `θ̂ ± 1.645·√(reliability·se²)`. Hyperparameters
+fit **per season** on PA ≥ 100 (μ ≈ 0.305–0.318, τ ≈ 0.031, median reliability ≈ 0.65),
+applied to all 2,636 player-seasons. Small samples pull toward the mean (Trout 2024, 125 PA:
+raw .407 → **talent .341** [.299,.383]); interval width falls 0.083 (30–100 PA) → 0.047 (450+).
+
+**Validation (predict next-season actual wOBA, r; target-year PA ≥ 100):**
+
+| population | n | EB talent | raw | Savant |
+|---|---|---|---|---|
+| pooled, PA_T ≥ 100 (vs 0.487 anchor) | 1060 | **0.489** | 0.484 | 0.491 |
+| pooled, PA_T ≥ 30 (admits low-PA) | 1173 | **0.467** | 0.445 | 0.452 |
+
+**Verdict: EB talent beats raw in both populations and beats Savant once genuinely low-PA
+seasons are admitted (0.467 vs 0.452); at the PA≥100 anchor it is at parity with Savant
+(0.489 vs 0.491)** — same tie as v0, but now with a sample-size-honest *center*. The win is
+a **pooled** variance-compression effect, not a per-band one: within a narrow PA band
+reliability is ~constant so `θ̂` is ~affine in raw and Pearson r is affine-invariant — the
+per-band talent−raw gaps (`by_band` in `talent_metrics.json`) are noise, **not** a bug.
+Carried to Phase 2: the prior is the flat league mean (→ BART contact-quality prior), and
+the interval is estimation-only (→ combine with BART's surface term). See
+`results/talent/NOTES.md`.
+
 ## Stage C decision (spec §15.3)
 
 From Stage B (14.2 min on 50k rows), full-train (~363k rows) extrapolates to ~100 min
