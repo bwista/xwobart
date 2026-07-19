@@ -50,6 +50,81 @@ def fig_reliability(figdir, tbl):
     fig.tight_layout(); fig.savefig(figdir / "reliability_vs_pa.png", dpi=120); plt.close(fig)
 
 
+PREDS = ("xwoba_talent", "xwoba_raw", "xwoba_savant")
+
+
+def validate(cfg, tbl) -> dict:
+    """Predict next-season actual wOBA from {EB talent, raw xwOBA, Savant} at season T.
+
+    Shrinkage's benefit is variance-compression across a heterogeneous-PA population,
+    so it shows up in the POOLED correlation, not in within-PA-band ranking: inside a
+    narrow PA band reliability is ~constant, so talent = mu(1-c)+c*raw is ~affine in raw
+    and Pearson r is affine-invariant. We therefore report (1) the pooled PA>=min_pa
+    result as the primary comparison against Savant's r-0.487 anchor, (2) a pooled result
+    that ADMITS genuinely low-PA seasons (relax the season-T floor to 30, keep target
+    >=min_pa so the T+1 wOBA is stable) — the regime shrinkage is built for, and (3) a
+    by-PA-band table showing the per-band talent-vs-raw gaps are noise-dominated by
+    construction (see the module note above)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from benchmark_vs_savant import actual_woba, _pearson, _calibrated_rmse
+
+    act = actual_woba(cfg.raw_dir, cfg.all_seasons)
+    base = tbl.select(
+        "batter", "season", "xwoba_talent", "xwoba_raw", "xwoba_savant", "PA", "reliability"
+    ).join(act.select("batter", "season", "actual_woba"), on=["batter", "season"], how="inner")
+
+    def make_pairs(pa_t_floor: int) -> pl.DataFrame:
+        """Season-T rows (PA >= pa_t_floor) joined to their T+1 actual wOBA, keeping only
+        players with a stable next-season sample (pa_next >= min_pa)."""
+        rows = []
+        for t in cfg.all_seasons[:-1]:
+            a = base.filter(pl.col("season") == t)
+            b = base.filter(pl.col("season") == t + 1).select(
+                "batter", target="actual_woba", pa_next="PA")
+            rows.append(a.join(b, on="batter", how="inner").filter(
+                (pl.col("PA") >= pa_t_floor) & (pl.col("pa_next") >= cfg.min_pa)))
+        return pl.concat(rows)
+
+    def pooled(pairs: pl.DataFrame, with_rmse: bool) -> dict:
+        tgt = pairs["target"].to_numpy()
+        d = {"n": pairs.height}
+        for pred in PREDS:
+            p = pairs[pred].to_numpy()
+            d[pred] = {"r": _pearson(p, tgt)}
+            if with_rmse:
+                d[pred]["rmse_calibrated"] = _calibrated_rmse(p, tgt)
+        d["talent_beats_raw"] = d["xwoba_talent"]["r"] > d["xwoba_raw"]["r"]
+        d["talent_beats_savant"] = d["xwoba_talent"]["r"] > d["xwoba_savant"]["r"]
+        return d
+
+    primary = make_pairs(cfg.min_pa)         # PA_T >= min_pa: the anchor comparison
+    inclusive = make_pairs(30)               # admit genuinely low-PA seasons
+    out = {
+        "note": "Pooled r is the instrument for shrinkage benefit; per-band r is "
+                "affine-invariant to shrinkage and noise-dominated (see by_band).",
+        "n_pairs": primary.height,
+        "pooled_pa_min": {"pa_t_floor": cfg.min_pa, **pooled(primary, with_rmse=True)},
+        "pooled_lowpa_inclusive": {"pa_t_floor": 30, **pooled(inclusive, with_rmse=False)},
+        "by_band": [],
+    }
+    for lo, hi in ((30, 60), (60, 100), (100, 250), (250, 10_000_000)):
+        band = inclusive.filter((pl.col("PA") >= lo) & (pl.col("PA") < hi))
+        if band.height < 20:
+            continue
+        tgt = band["target"].to_numpy()
+        out["by_band"].append({
+            "band": f"[{lo},{hi if hi < 10_000_000 else 'inf'})",
+            "n": band.height,
+            "median_reliability": float(band["reliability"].median()),
+            "mean_abs_talent_minus_raw": float(
+                (band["xwoba_talent"] - band["xwoba_raw"]).abs().mean()),
+            **{pred: {"r": _pearson(band[pred].to_numpy(), tgt)} for pred in PREDS},
+        })
+    # primary verdict vs the Savant anchor is on the PA>=min_pa pooled population
+    out["beats_savant_pooled"] = out["pooled_pa_min"]["talent_beats_savant"]
+    return out
+
+
 def main():
     cfg = load_config()
     seasons = cfg.all_seasons
@@ -77,6 +152,7 @@ def main():
             .sort("shrink", descending=True).head(15)
             .select("player_name", "season", "PA", "xwoba_raw", "xwoba_talent", "reliability").to_dicts(),
     }
+    metrics["validation"] = validate(cfg, tbl)
     (outdir / "talent_metrics.json").write_text(json.dumps(metrics, indent=2, default=float))
     print(json.dumps(metrics, indent=2, default=float))
     print(f"  wrote {outdir}/")
