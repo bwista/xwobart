@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from src.talent import build_pa_values, per_player_raw
+from src.talent import build_pa_values, eb_fit, eb_shrink, per_player_raw
 
 
 def _pitches():
@@ -37,3 +37,36 @@ def test_per_player_raw_xwoba_and_se():
     vals = np.array([1.2, 0.1, 0.69])
     assert abs(r1["se"] - vals.std(ddof=1) / np.sqrt(3)) < 1e-9
     assert r1["se2"] > 0
+
+
+def test_eb_fit_recovers_hyperparameters():
+    # Simulate true talents ~ N(0.32, 0.05^2); noisy observations with known SEs.
+    rng = np.random.default_rng(0)
+    n = 4000
+    theta = rng.normal(0.32, 0.05, n)
+    se = rng.uniform(0.02, 0.08, n)            # heteroscedastic (small vs large samples)
+    raw = theta + rng.normal(0, se)
+    mu, tau2 = eb_fit(raw, se ** 2)
+    assert abs(mu - 0.32) < 0.005
+    assert abs(np.sqrt(tau2) - 0.05) < 0.01
+
+
+def test_eb_shrink_monotone_and_centered():
+    mu, tau2 = 0.320, 0.05 ** 2
+    raw = np.array([0.400, 0.400])             # same raw, different precision
+    se2 = np.array([0.02 ** 2, 0.08 ** 2])     # small SE (many PA) vs large SE (few PA)
+    theta, pv, lo, hi, rel = eb_shrink(raw, se2, mu, tau2)
+    # smaller SE -> higher reliability -> less shrinkage -> theta closer to raw
+    assert rel[0] > rel[1]
+    assert theta[0] > theta[1]
+    assert mu < theta[1] < raw[1]              # shrinks toward mu, never past it
+    # posterior interval is narrower for the more reliable (smaller-SE) estimate
+    assert (hi[0] - lo[0]) < (hi[1] - lo[1])
+    # posterior variance = tau2*se2/(tau2+se2)
+    assert np.allclose(pv, tau2 * se2 / (tau2 + se2))
+
+
+def test_eb_shrink_edge_zero_tau():
+    # No between-player spread -> full shrink to mu, degenerate interval floored, not NaN.
+    theta, pv, lo, hi, rel = eb_shrink(np.array([0.5]), np.array([0.01]), 0.32, 0.0)
+    assert theta[0] == 0.32 and rel[0] == 0.0 and np.isfinite(lo[0]) and np.isfinite(hi[0])

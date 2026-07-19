@@ -48,3 +48,30 @@ def per_player_raw(pav: pl.DataFrame) -> pl.DataFrame:
         .drop("num", "den", "sd")
         .sort("batter", "season")
     )
+
+
+def eb_fit(raw: np.ndarray, se2: np.ndarray, tau2_floor: float = 1e-8) -> tuple[float, float]:
+    """Gaussian–Gaussian empirical Bayes by method of moments (DerSimonian–Laird
+    style). Observed variance of raw = between-player τ² + mean within-player SE²;
+    μ is the precision-weighted mean. Returns (mu, tau2)."""
+    raw = np.asarray(raw, float)
+    se2 = np.asarray(se2, float)
+    grand = raw.mean()
+    tau2 = max(float(((raw - grand) ** 2).mean() - se2.mean()), tau2_floor)
+    w = 1.0 / (tau2 + se2)
+    mu = float((w * raw).sum() / w.sum())
+    # one refinement of tau2 around the weighted mean
+    tau2 = max(float((w * ((raw - mu) ** 2 - se2)).sum() / w.sum()), tau2_floor)
+    return mu, tau2
+
+
+def eb_shrink(raw: np.ndarray, se2: np.ndarray, mu: float, tau2: float):
+    """Posterior for each player's true talent under N(mu, tau2) prior and N(theta, se2)
+    likelihood. Returns (theta_hat, post_var, ci_lo, ci_hi, reliability)."""
+    raw = np.asarray(raw, float)
+    se2 = np.asarray(se2, float)
+    rel = tau2 / (tau2 + se2) if tau2 > 0 else np.zeros_like(se2)
+    theta = mu + rel * (raw - mu)
+    post_var = rel * se2                      # = tau2*se2/(tau2+se2); 0 when tau2==0
+    half = Z90 * np.sqrt(post_var)
+    return theta, post_var, theta - half, theta + half, rel
