@@ -82,6 +82,21 @@ vs next-season actual wOBA with a gap-CI excluding 0.** See `results/benchmark/N
 The per-player credible intervals are honest but do NOT shrink with PA (Task A,
 `results/task_a/`) — they track surface uncertainty, not sample size.
 
+## Post-v0 — sample-size-aware per-player interval (the actual product)
+
+If the deliverable is a per-player band showing where a hitter's xwOBA could sit given
+their N PAs (wide early, tightening with PA), v0's model interval is the wrong object.
+A **bootstrap over each player's PAs** (`scripts/player_ci_bootstrap.py`,
+`results/player_ci/`, no re-fit) gives the right band: median width falls 0.102 (100–150
+PA) → 0.051 (500–750 PA), `log(width)`~`log(PA)` slope −0.42, width vs analytic SE r=0.994.
+It **crosses v0's flat model band at ~400 PA**: below that v0 is up to ~1.8× too narrow
+(0.056 vs 0.102 at 100 PA) — it understates uncertainty exactly in the short-term / small-
+sample regime the product targets. This band is model-agnostic (built on Savant per-BBE
+values). The principled end-state combines two terms, `width ≈ √(sampling² + surface²)` —
+the bootstrap sampling term (dominant at low PA) plus BART's surface posterior (~flat 0.056,
+dominant at high PA), which is the one piece BART uniquely supplies. See
+`results/player_ci/NOTES.md`.
+
 ## Stage C decision (spec §15.3)
 
 From Stage B (14.2 min on 50k rows), full-train (~363k rows) extrapolates to ~100 min
