@@ -134,3 +134,59 @@ def assemble_measurements(pam: pl.DataFrame, B: int = 500,
             B=B, rng=rng,
         )
     return meas.with_columns(s_ok=pl.Series(np.isfinite(S[:, 0, 0]))), S
+
+
+def mvn_mle(z: np.ndarray, S: np.ndarray, season_idx: np.ndarray,
+            n_seasons: int) -> tuple[np.ndarray, np.ndarray]:
+    """Marginal MLE of per-season means mu (n_seasons, D) and the shared talent
+    covariance Sigma (D, D) under z_i ~ N(mu[t_i], Sigma + S_i). Sigma is
+    parameterized by its Cholesky factor with log-diagonal (PSD by construction).
+    Assumes standardized inputs (O(1) scales). L-BFGS-B, numeric gradient — 18
+    params at D=3, a few seconds on ~2k rows."""
+    n, D = z.shape
+    tril = np.tril_indices(D)
+
+    def build_L(lp: np.ndarray) -> np.ndarray:
+        L = np.zeros((D, D))
+        L[tril] = lp
+        L[np.diag_indices(D)] = np.exp(np.diag(L))
+        return L
+
+    def nll(params: np.ndarray) -> float:
+        mu = params[: n_seasons * D].reshape(n_seasons, D)
+        Sigma = (L := build_L(params[n_seasons * D:])) @ L.T
+        C = Sigma[None] + S
+        diff = z - mu[season_idx]
+        sol = np.linalg.solve(C, diff[..., None])[..., 0]
+        _, logdet = np.linalg.slogdet(C)
+        return 0.5 * float(np.sum(logdet + np.einsum("nd,nd->n", diff, sol)))
+
+    # init: per-season means; Sigma0 = cov(z) - mean(S), eigenvalue-clipped PSD
+    mu0 = np.stack([z[season_idx == t].mean(axis=0) if (season_idx == t).any()
+                    else z.mean(axis=0) for t in range(n_seasons)])
+    Sigma0 = np.cov(z, rowvar=False).reshape(D, D) - S.mean(axis=0)
+    w, V = np.linalg.eigh((Sigma0 + Sigma0.T) / 2)
+    L0 = np.linalg.cholesky(V @ np.diag(np.clip(w, 1e-4, None)) @ V.T)
+    lp0 = L0[tril].copy()
+    lp0[np.cumsum(np.arange(1, D + 1)) - 1] = np.log(np.diag(L0))
+    x0 = np.concatenate([mu0.ravel(), lp0])
+    res = minimize(nll, x0, method="L-BFGS-B", options={"maxiter": 500})
+    mu = res.x[: n_seasons * D].reshape(n_seasons, D)
+    L = build_L(res.x[n_seasons * D:])
+    return mu, L @ L.T
+
+
+def mvn_posterior(z: np.ndarray, S: np.ndarray, mu: np.ndarray,
+                  Sigma: np.ndarray, season_idx: np.ndarray
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """Closed-form conditional posterior of the latent talent vector per row:
+    theta = mu + Sigma (Sigma+S_i)^-1 (z - mu); V = Sigma - Sigma (Sigma+S_i)^-1 Sigma.
+    Returns (theta (n, D), posterior variance of dim 0 (n,)). At D=1 this is
+    exactly Phase 1's eb_shrink."""
+    C = Sigma[None] + S
+    A = np.transpose(np.linalg.solve(C, np.broadcast_to(Sigma, C.shape).copy()),
+                     (0, 2, 1))                       # Sigma (Sigma+S_i)^-1
+    diff = z - mu[season_idx]
+    theta = mu[season_idx] + np.einsum("nij,nj->ni", A, diff)
+    V0 = Sigma[0, 0] - np.einsum("nj,j->n", A[:, 0, :], Sigma[:, 0])
+    return theta, np.maximum(V0, 0.0)

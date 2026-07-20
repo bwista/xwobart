@@ -1,11 +1,14 @@
 import numpy as np
 import polars as pl
 
+from src.talent import eb_fit, eb_shrink
 from src.talent2 import (
     FLOOR_SD_PER_PA,
     assemble_measurements,
     bootstrap_S,
     build_pa_measurements,
+    mvn_mle,
+    mvn_posterior,
     player_measurements,
 )
 
@@ -129,3 +132,78 @@ def test_assemble_measurements_aligns_and_flags():
     # smaller xwOBA measurement variance
     m = {b: S[i, 0, 0] for i, b in enumerate(meas["batter"].to_list())}
     assert m[1] < m[2] < m[3]
+
+
+# n is set so the recovery tolerances below are ~4 sampling SEs, not ~2: with
+# Var(z) = Sigma + E[S] ~ 1.9 per dim, SE(mu_season) ~ sqrt(1.9/(n/2)), so n=8000
+# gives SE ~ 0.022 against the 0.08 tolerance. (At n=3000 the seed-3 draw lands
+# 2.5 SEs out and the test fails for reasons that have nothing to do with the code.)
+def _simulate_mvn(n=8000, seed=3):
+    rng = np.random.default_rng(seed)
+    mu_true = np.array([[0.0, 0.2, -0.1], [0.3, -0.2, 0.1]])   # 2 seasons x 3 dims
+    sd = np.array([1.0, 0.8, 0.6])
+    C = np.array([[1.0, 0.6, 0.5], [0.6, 1.0, 0.3], [0.5, 0.3, 1.0]])
+    Sigma_true = C * np.outer(sd, sd)
+    t = rng.integers(0, 2, n)
+    theta = mu_true[t] + rng.multivariate_normal(np.zeros(3), Sigma_true, n)
+    S = np.empty((n, 3, 3))
+    z = np.empty((n, 3))
+    for i in range(n):
+        s_sd = rng.uniform(0.3, 1.5, 3)
+        Si = np.diag(s_sd ** 2)
+        Si[0, 1] = Si[1, 0] = 0.5 * s_sd[0] * s_sd[1]       # shared noise
+        S[i] = Si
+        z[i] = theta[i] + rng.multivariate_normal(np.zeros(3), Si)
+    return z, S, t, mu_true, Sigma_true
+
+
+def test_mvn_mle_parameter_recovery():
+    z, S, t, mu_true, Sigma_true = _simulate_mvn()
+    mu, Sigma = mvn_mle(z, S, t, n_seasons=2)
+    assert np.abs(mu - mu_true).max() < 0.08
+    assert np.abs(np.diag(Sigma) / np.diag(Sigma_true) - 1).max() < 0.15
+    corr = Sigma / np.sqrt(np.outer(np.diag(Sigma), np.diag(Sigma)))
+    corr_true = Sigma_true / np.sqrt(np.outer(np.diag(Sigma_true), np.diag(Sigma_true)))
+    assert np.abs(corr - corr_true).max() < 0.12
+
+
+def test_mvn_mle_1d_matches_eb_fit():
+    # Same setup as Phase 1's test_eb_fit_recovers_hyperparameters
+    rng = np.random.default_rng(0)
+    n = 4000
+    theta = rng.normal(0.32, 0.05, n)
+    se = rng.uniform(0.02, 0.08, n)
+    raw = theta + rng.normal(0, se)
+    mu, Sigma = mvn_mle(raw[:, None], (se ** 2)[:, None, None],
+                        np.zeros(n, int), n_seasons=1)
+    mu_eb, tau2_eb = eb_fit(raw, se ** 2)
+    assert abs(mu[0, 0] - mu_eb) < 0.003
+    assert abs(np.sqrt(Sigma[0, 0]) - np.sqrt(tau2_eb)) < 0.005
+
+
+def test_mvn_posterior_1d_equals_eb_shrink():
+    mu_s, tau2 = 0.320, 0.05 ** 2
+    raw = np.array([0.40, 0.40, 0.25])
+    se2 = np.array([0.02 ** 2, 0.08 ** 2, 0.03 ** 2])
+    theta, var0 = mvn_posterior(raw[:, None], se2[:, None, None],
+                                np.array([[mu_s]]), np.array([[tau2]]),
+                                np.zeros(3, int))
+    t_eb, pv_eb, *_ = eb_shrink(raw, se2, mu_s, tau2)
+    assert np.allclose(theta[:, 0], t_eb) and np.allclose(var0, pv_eb)
+
+
+def test_mvn_posterior_peripheral_pull_and_information_gain():
+    # Two low-PA players, identical league-average xwOBA measurement; one has
+    # elite, precisely-measured peripherals. Positive talent correlations must
+    # pull his xwOBA talent above the mean, with LOWER posterior variance than
+    # the 1-D shrink of the same xwOBA measurement.
+    mu = np.array([[0.0, 0.0, 0.0]])
+    C = np.array([[1.0, 0.7, 0.6], [0.7, 1.0, 0.4], [0.6, 0.4, 1.0]])
+    z = np.array([[0.0, 2.0, 2.0],     # league xwOBA, elite peripherals
+                  [0.0, 0.0, 0.0]])    # league everything
+    S = np.tile(np.diag([4.0, 0.1, 0.1]), (2, 1, 1))   # xwOBA noisy, periphs tight
+    theta, var0 = mvn_posterior(z, S, mu, C, np.zeros(2, int))
+    assert theta[0, 0] > 0.5 and abs(theta[1, 0]) < 1e-9
+    t1, v1 = mvn_posterior(z[:, :1], S[:, :1, :1], mu[:, :1], C[:1, :1],
+                           np.zeros(2, int))
+    assert var0[0] < v1[0]             # peripherals resolve xwOBA-talent variance
