@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import hashlib
 import json
 import pickle
@@ -72,6 +73,13 @@ def main() -> None:
                     help="spray-marginalized per-event values via M equal-mass league "
                          "quantiles per (EV, LA, stand) cell; 0 = skip. Costs M x the "
                          "prediction pass (~30 min at M=9 on Stage C)")
+    ap.add_argument("--m-trees", type=int, default=None, metavar="M",
+                    help="override the stage's m_trees (capacity experiments). Fit cost "
+                         "is ~linear in this: 50 -> ~27 min, 200 -> ~107 min at Stage C")
+    ap.add_argument("--tag", default="", metavar="STR",
+                    help="suffix for the output dir, e.g. --tag m200a -> "
+                         "results/stage_C_spray_m200a. Keeps capacity runs from "
+                         "overwriting the frozen anchor dirs")
     ap.add_argument("--force-data", action="store_true")
     ap.add_argument("--acknowledge-runtime", action="store_true",
                     help="user has signed off on a >30 min fit estimate")
@@ -80,8 +88,11 @@ def main() -> None:
     t_start = time.perf_counter()
     cfg = load_config()
     stage = cfg.stages[args.stage]
+    if args.m_trees is not None:
+        stage = dataclasses.replace(stage, m_trees=args.m_trees)
     # results/stage_C is NEVER overwritten by the spray run: the ELPD anchor lives there.
     suffix = "" if args.variant == "v0" else f"_{args.variant}"
+    suffix += f"_{args.tag}" if args.tag else ""
     stage_dir = cfg.results_dir / f"stage_{args.stage}{suffix}"
     features = prep.VARIANT_FEATURES[args.variant]
     figdir = stage_dir / "figures"
@@ -285,6 +296,16 @@ def main() -> None:
         pt_hold["sprint_speed"].to_numpy()[gb_mask],
     )
 
+    # Per-event holdout log-likelihood, persisted for EVERY variant (it is <1 MB). Two
+    # runs over the same holdout can then be compared with a PAIRED per-event test, whose
+    # standard error is far below the ~244 on each total because both models are driven by
+    # the same EV/LA signal and their per-event errors are strongly correlated. The digest
+    # is what makes pairing safe: it proves the two runs scored the same events in the same
+    # order rather than merely the same count.
+    np.save(stage_dir / "lppd_i_holdout.npy", b_hold.lppd_i.astype(np.float64))
+    metrics["holdout_order_digest"] = hashlib.sha256(
+        pt_hold["batter"].to_numpy().tobytes()).hexdigest()[:16]
+
     # ---- optional Stage-4 products (AFTER the ELPD verdict is durable on disk) ----
     if args.variant == "spray":
         # Stage-4 prerequisite: per-event value draws. Stage 4 folds their between-draw
@@ -318,7 +339,6 @@ def main() -> None:
             "train": persist("train", b_train.ev_draws, pt_train),
             "holdout": persist("holdout", b_hold.ev_draws, pt_hold),
         }
-        np.save(stage_dir / "lppd_i_holdout.npy", b_hold.lppd_i.astype(np.float64))
         print("persisted draws:", metrics["persisted_draws"])
 
     if args.variant == "spray" and args.marginalize_spray:

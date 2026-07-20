@@ -443,6 +443,39 @@ claims: surface errors are **correlated across players in the same feature regio
 summing or averaging these intervals across players understates the true uncertainty. A
 league-level statement needs the per-draw refit variant, not these draws.
 
+### Next experiment — does spray help at matched capacity? (`scripts/capacity_experiment.py`)
+
+The capacity-dilution reading above is testable, and the script is written and smoke-tested
+end to end (not yet run at Stage C). It fits **three** models at the same enlarged tree
+budget and compares them to each other rather than to the frozen 3-feature anchor:
+
+```bash
+.venv/bin/python scripts/capacity_experiment.py --dry-run        # print the plan
+.venv/bin/python scripts/capacity_experiment.py                  # m_trees=200, ~5.3 h
+.venv/bin/python scripts/capacity_experiment.py --analyze        # re-score existing fits
+.venv/bin/python scripts/capacity_experiment.py --stage A --m-trees 8   # ~1 min wiring smoke
+```
+
+1. **v0 at the new capacity** — the fresh anchor.
+2. **v0 again** — the replicate, whose gap to (1) *measures* the noise floor at this
+   capacity rather than assuming Stage 3's 267 nats carries over.
+3. **spray at the new capacity** — the treatment.
+
+Completed fits are skipped on re-run, so an interruption costs one fit rather than the set
+(each is ~107 min at `m_trees=200`, and each writes ~4 GB of `idata.nc`).
+
+Two verdicts are reported. The **unpaired** one repeats Stage 3's logic against the new
+anchor and noise floor. The **paired** one is sharper and is why `run_v0.py` now persists
+per-event holdout log-likelihood for *every* variant: over the same 122,006 events in the
+same order it bootstraps the per-event difference, and because both models are driven
+mostly by the same EV × LA signal their per-event errors are strongly correlated — so the
+paired interval is far tighter than the ±244 on either total and can resolve differences
+the unpaired test cannot see. `metrics["holdout_order_digest"]` is asserted equal across
+runs before pairing, so the test cannot silently compare misaligned events.
+
+Both verdicts distinguish three outcomes — better, worse, indistinguishable. A large
+*negative* gap is a significant degradation, not a null result.
+
 **Localization is not like-for-like under `--variant spray`.**
 `metrics["localization"]["grounder_slope_per_ftps"]` is the **pulled**-grounder slope (the
 spray grids are RHB at ±20°), so it cannot be compared directly to v0's spray-blind
