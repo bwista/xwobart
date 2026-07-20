@@ -181,3 +181,23 @@ def test_add_spray_rejects_null_stand():
     bad = _spray_df().with_columns(stand=pl.lit(None, dtype=pl.Utf8))
     with pytest.raises(AssertionError, match="stand"):
         add_spray(bad, *spray_impute_table(_spray_df()))
+
+
+from src.prep import FEATURES_SPRAY, FEATURES_V0
+
+
+def test_feature_lists_and_variant_selection():
+    assert FEATURES_V0 == ["launch_speed", "launch_angle", "sprint_speed"]
+    assert FEATURES_SPRAY == ["launch_speed", "launch_angle", "spray_pull",
+                              "stand_R", "sprint_speed"]
+    df = pl.DataFrame({
+        "launch_speed": [90.0, 100.0], "launch_angle": [10.0, 25.0],
+        "spray_pull": [-12.0, 30.0], "stand_R": [1.0, 0.0],
+        "sprint_speed": [27.0, 29.5], "outcome_class": [0, 4], "extra": ["a", "b"],
+    })
+    X3, y = build_features(df)                       # default stays v0: 3 columns
+    assert X3.shape == (2, 3) and X3[1, 2] == 29.5
+    X5, _ = build_features(df, FEATURES_SPRAY)
+    assert X5.shape == (2, 5) and X5.dtype == np.float64
+    assert X5[0].tolist() == [90.0, 10.0, -12.0, 1.0, 27.0]
+    assert y.tolist() == [0, 4]

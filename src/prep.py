@@ -7,7 +7,10 @@ import polars as pl
 HIT_CLASS = {"single": 1, "double": 2, "triple": 3, "home_run": 4}
 CLASS_NAMES = ["out", "single", "double", "triple", "home_run"]
 K = 5
-FEATURES = ["launch_speed", "launch_angle", "sprint_speed"]
+FEATURES_V0 = ["launch_speed", "launch_angle", "sprint_speed"]
+FEATURES_SPRAY = ["launch_speed", "launch_angle", "spray_pull", "stand_R", "sprint_speed"]
+FEATURES = FEATURES_V0          # back-compat default; run_v0 --variant selects
+VARIANT_FEATURES = {"v0": FEATURES_V0, "spray": FEATURES_SPRAY}
 
 
 def filter_bbe(df: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -48,9 +51,12 @@ def class_distribution(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def build_features(bbe: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-    """Exactly three features, float64; no standardization (BART does not need it)."""
-    X = bbe.select(FEATURES).to_numpy().astype(np.float64)
+def build_features(bbe: pl.DataFrame, features: list[str] | None = None
+                   ) -> tuple[np.ndarray, np.ndarray]:
+    """Feature matrix, float64; no standardization (BART does not need it). `features`
+    defaults to the v0 three so existing callers and the frozen v0 path are unchanged."""
+    cols = features or FEATURES_V0
+    X = bbe.select(cols).to_numpy().astype(np.float64)
     y = bbe["outcome_class"].to_numpy().astype(np.int64)
     return X, y
 
