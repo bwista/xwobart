@@ -30,7 +30,7 @@
     {
       "id": 5,
       "subject": "Task 5: Spray sign QC gates S1-S6 (before the fit)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         4
@@ -39,12 +39,12 @@
     {
       "id": 6,
       "subject": "Task 6: Variant-aware evaluation helpers (TDD)",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": 7,
       "subject": "Task 7: Wire --variant spray into run_v0 + draw persistence + marginalization",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2,
         5,
