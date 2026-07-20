@@ -77,3 +77,40 @@ def test_contact_grids():
     assert np.all(X_g[:, 0] == 85.0) and np.all(X_g[:, 1] == -10.0)
     assert np.all(X_b[:, 0] == 103.0) and np.all(X_b[:, 1] == 28.0)
     assert np.all(X_g[:, 2] == s)
+
+
+from src.evaluate import contact_grids
+
+
+def test_contact_grids_v0_unchanged():
+    s, g, b = contact_grids((23.0, 31.0, 5))
+    assert s.shape == (5,) and g.shape == (5, 3) and b.shape == (5, 3)
+    assert g[0].tolist() == [85.0, -10.0, 23.0]
+    assert b[0].tolist() == [103.0, 28.0, 23.0]
+
+
+def test_contact_grids_spray_variant_adds_pulled_and_oppo_grounders():
+    s, grids = contact_grids((23.0, 31.0, 5), variant="spray")
+    assert set(grids) == {"grounder_pull", "grounder_oppo", "barrel_pull"}
+    for name, X in grids.items():
+        assert X.shape == (5, 5)
+        assert X[0, 3] == 1.0                      # stand_R: all grids are RHB
+        assert X[0, 4] == 23.0                     # sprint speed is the last column
+    assert grids["grounder_pull"][0].tolist() == [85.0, -10.0, 20.0, 1.0, 23.0]
+    assert grids["grounder_oppo"][0].tolist() == [85.0, -10.0, -20.0, 1.0, 23.0]
+    assert grids["barrel_pull"][0].tolist() == [103.0, 28.0, 20.0, 1.0, 23.0]
+
+
+def test_la_spray_grid_is_row_major_over_la_then_spray():
+    from src.evaluate import la_spray_grid
+
+    la_ax, sp_ax, X = la_spray_grid(la=(0.0, 30.0, 4), spray=(-20.0, 20.0, 3))
+    assert la_ax.tolist() == [0.0, 10.0, 20.0, 30.0]
+    assert sp_ax.tolist() == [-20.0, 0.0, 20.0]
+    assert X.shape == (12, 5)
+    # row-major: LA is the slow axis, spray the fast one -- the reshape in the figure
+    # code is X[:, k].reshape(len(la_ax), len(sp_ax)) and depends on exactly this
+    assert X[:3, 1].tolist() == [0.0, 0.0, 0.0]
+    assert X[:3, 2].tolist() == [-20.0, 0.0, 20.0]
+    assert X[3, 1] == 10.0
+    assert (X[:, 0] == 103.0).all() and (X[:, 3] == 1.0).all()

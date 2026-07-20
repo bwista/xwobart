@@ -158,14 +158,49 @@ def undercorrection(actual: np.ndarray, model_pred: np.ndarray, public_pred: np.
     }
 
 
-def contact_grids(grid_cfg: tuple[float, float, int]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+SPRAY_PULL_DEG = 20.0     # ~ the HR-region pull angle measured on 2022-25
+
+
+def contact_grids(grid_cfg: tuple[float, float, int], variant: str = "v0"):
     """Fixed contact points crossed with a sprint-speed grid (spec §9.3):
-    topped grounder (85, -10) and barrel (103, 28)."""
+    topped grounder (85, -10) and barrel (103, 28).
+
+    variant 'v0'    -> (s, grounder(n,3), barrel(n,3)) -- unchanged, 3 features.
+    variant 'spray' -> (s, {name: (n,5)}) with the SAME grounder hit PULLED (+20 deg)
+    and OPPOSITE (-20 deg). All grids are RHB (stand_R = 1.0). The pull/oppo pair is
+    the E7 diagnostic: once the surface can see direction, sprint speed's payoff should
+    concentrate on pulled grounders (the ones a fast runner beats out)."""
     lo, hi, n = grid_cfg
-    s = np.linspace(lo, hi, int(n))
-    grounder = np.column_stack([np.full(int(n), 85.0), np.full(int(n), -10.0), s])
-    barrel = np.column_stack([np.full(int(n), 103.0), np.full(int(n), 28.0), s])
-    return s, grounder, barrel
+    n = int(n)
+    s = np.linspace(lo, hi, n)
+    if variant == "v0":
+        grounder = np.column_stack([np.full(n, 85.0), np.full(n, -10.0), s])
+        barrel = np.column_stack([np.full(n, 103.0), np.full(n, 28.0), s])
+        return s, grounder, barrel
+
+    def g(ls: float, la: float, spray: float) -> np.ndarray:
+        return np.column_stack([np.full(n, ls), np.full(n, la), np.full(n, spray),
+                                np.ones(n), s])
+
+    return s, {"grounder_pull": g(85.0, -10.0, SPRAY_PULL_DEG),
+               "grounder_oppo": g(85.0, -10.0, -SPRAY_PULL_DEG),
+               "barrel_pull": g(103.0, 28.0, SPRAY_PULL_DEG)}
+
+
+def la_spray_grid(la: tuple[float, float, int] = (0.0, 45.0, 19),
+                  spray: tuple[float, float, int] = (-45.0, 45.0, 37),
+                  launch_speed: float = 103.0, sprint: float = 27.0
+                  ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """LA x spray grid at fixed EV for the spec's HR-band partial-dependence plot
+    (spec §"Recommended spec": "PDP/importance for spray (HR band in LA x spray)").
+    Returns (la_axis, spray_axis, X (n_la*n_spray, 5)) in row-major order, RHB."""
+    la_ax = np.linspace(*la[:2], int(la[2]))
+    sp_ax = np.linspace(*spray[:2], int(spray[2]))
+    L, S = np.meshgrid(la_ax, sp_ax, indexing="ij")
+    n = L.size
+    X = np.column_stack([np.full(n, launch_speed), L.ravel(), S.ravel(),
+                         np.ones(n), np.full(n, sprint)])
+    return la_ax, sp_ax, X
 
 
 def localization(figdir: Path, s: np.ndarray, grounder_ev: np.ndarray, barrel_ev: np.ndarray,
@@ -194,7 +229,8 @@ def localization(figdir: Path, s: np.ndarray, grounder_ev: np.ndarray, barrel_ev
     return out
 
 
-def variable_importance(figdir: Path, model, idata, X: np.ndarray) -> dict:
+def variable_importance(figdir: Path, model, idata, X: np.ndarray,
+                        labels: list[str] | None = None) -> dict:
     """pymc-bart variable importance for the three features. The API has moved between
     versions — adapt the call to the installed version if it raises; metrics tolerate
     an 'unavailable' record but Stage B should ship real numbers (spec §9.3)."""
@@ -206,7 +242,7 @@ def variable_importance(figdir: Path, model, idata, X: np.ndarray) -> dict:
         fig = (axes[0] if isinstance(axes, (list, np.ndarray)) else axes).figure
         fig.savefig(figdir / "variable_importance.png", dpi=120)
         plt.close(fig)
-        labels = ["launch_speed", "launch_angle", "sprint_speed"]
+        labels = labels or ["launch_speed", "launch_angle", "sprint_speed"]
         # Keep only small summary fields. compute_variable_importance also returns large
         # per-event `preds`/`preds_all` arrays (for plotting) that bloat metrics.json to
         # ~100s of MB — never serialize those.
