@@ -1,4 +1,5 @@
 import polars as pl
+import pytest
 
 from src.prep import add_outcome_class, class_distribution, filter_bbe
 
@@ -99,3 +100,84 @@ def test_subsample_reproducible_and_noop_when_large():
     assert a == b
     assert stratified_subsample(df, 10_000_000, seed=1).height == df.height
     assert stratified_subsample(df, None, seed=1).height == df.height
+
+
+from src.prep import HOME_PLATE_X, HOME_PLATE_Y, add_spray, spray_impute_table
+
+
+def _spray_df():
+    """Four BBE with hand-computed geometry, plus one with hc missing.
+
+    hc_x < 125.42 is LEFT field, hc_x > 125.42 is RIGHT field; hc_y DECREASES going
+    out toward the outfield, so 198.27 - hc_y > 0 for any ball in play.
+    """
+    return pl.DataFrame({
+        "batter":       [1, 2, 3, 4, 5],
+        "game_year":    [2024] * 5,
+        "stand":        ["R", "L", "R", "L", "R"],
+        # 45 deg to the LEFT, 45 deg to the RIGHT, dead center, 45 left, missing
+        "hc_x":         [75.42, 175.42, 125.42, 75.42, None],
+        "hc_y":         [148.27, 148.27, 148.27, 148.27, None],
+        "launch_speed": [100.0, 100.0, 100.0, 100.0, 100.0],
+        "launch_angle": [25.0, 25.0, 25.0, 25.0, 25.0],
+    })
+
+
+def test_add_spray_sign_convention_is_pull_relative():
+    cell, hand = spray_impute_table(_spray_df())
+    out = add_spray(_spray_df(), cell, hand).sort("batter")
+    # raw direction: negative = left field, positive = right field
+    assert abs(out["phi_raw"][0] - (-45.0)) < 1e-9      # RHB pulled to left
+    assert abs(out["phi_raw"][1] - (+45.0)) < 1e-9      # LHB pulled to right
+    assert abs(out["phi_raw"][2] - 0.0) < 1e-9          # dead center
+    assert abs(out["phi_raw"][3] - (-45.0)) < 1e-9      # LHB went OPPOSITE field
+    # pull-relative: POSITIVE means pulled, for BOTH hands
+    assert abs(out["spray_pull"][0] - (+45.0)) < 1e-9   # RHB to left  = pulled
+    assert abs(out["spray_pull"][1] - (+45.0)) < 1e-9   # LHB to right = pulled
+    assert abs(out["spray_pull"][2] - 0.0) < 1e-9
+    assert abs(out["spray_pull"][3] - (-45.0)) < 1e-9   # LHB to left  = opposite
+    assert out["stand_R"].to_list() == [1.0, 0.0, 1.0, 0.0, 1.0]
+
+
+def test_add_spray_mirror_is_not_identity_or_global_flip():
+    """Guards the two mirror bugs a single sign test cannot distinguish."""
+    out = add_spray(_spray_df(), *spray_impute_table(_spray_df())).sort("batter")
+    phi, sp = out["phi_raw"].to_numpy()[:4], out["spray_pull"].to_numpy()[:4]
+    assert not np.allclose(sp, phi)          # not "forgot to mirror"
+    assert not np.allclose(sp, -phi)         # not "mirrored both hands"
+
+
+def test_add_spray_imputes_missing_hc_and_flags_without_dropping():
+    df = _spray_df()
+    cell, hand = spray_impute_table(df)
+    out = add_spray(df, cell, hand).sort("batter")
+    assert out.height == df.height                      # NEVER drop: ELPD anchor n
+    assert out["spray_pull"].null_count() == 0
+    assert out["hc_imputed"].to_list() == [False, False, False, False, True]
+    # RHB with no hc falls back to the RHB median (cells need >= 25 rows, so the
+    # per-hand fallback is what fires here): median of the two RHB spray values
+    assert abs(out["spray_pull"][4] - float(np.median([45.0, 0.0]))) < 1e-9
+
+
+def test_spray_impute_table_uses_cells_when_dense_enough():
+    rng = np.random.default_rng(0)
+    n = 200
+    df = pl.DataFrame({
+        "batter": list(range(n)), "game_year": [2024] * n, "stand": ["R"] * n,
+        # all in one (ev_bin, la_bin) cell, all pulled to left field
+        "hc_x": (125.42 - rng.uniform(20, 60, n)).tolist(),
+        "hc_y": [148.27] * n,
+        "launch_speed": [101.0] * n, "launch_angle": [26.0] * n,
+    })
+    cell, hand = spray_impute_table(df)
+    assert cell.height == 1 and cell["spray_cell"][0] > 0     # pulled, positive
+    miss = df.head(1).with_columns(hc_x=pl.lit(None, dtype=pl.Float64),
+                                   hc_y=pl.lit(None, dtype=pl.Float64))
+    out = add_spray(miss, cell, hand)
+    assert out["hc_imputed"][0] and abs(out["spray_pull"][0] - cell["spray_cell"][0]) < 1e-9
+
+
+def test_add_spray_rejects_null_stand():
+    bad = _spray_df().with_columns(stand=pl.lit(None, dtype=pl.Utf8))
+    with pytest.raises(AssertionError, match="stand"):
+        add_spray(bad, *spray_impute_table(_spray_df()))

@@ -55,6 +55,73 @@ def build_features(bbe: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
+# Statcast hit-coordinate origin (home plate). hc_x increases toward RIGHT field;
+# hc_y DECREASES going out toward the outfield, hence the (198.27 - hc_y) term.
+HOME_PLATE_X = 125.42
+HOME_PLATE_Y = 198.27
+SPRAY_EV_BIN = 5.0        # mph, for the imputation lookup
+SPRAY_LA_BIN = 10.0       # degrees
+SPRAY_MIN_CELL = 25       # rows required before an (ev, la, stand) cell is trusted
+
+
+def _spray_cols(bbe: pl.DataFrame) -> pl.DataFrame:
+    """phi_raw (RAW direction, degrees: negative = left field, positive = right),
+    stand_R (1.0 / 0.0), the observed pull-relative angle, and the lookup bins.
+
+    A right-handed batter PULLS to left field, so the pull-relative angle negates
+    phi_raw for stand == 'R' and leaves stand == 'L' alone. Verified empirically on
+    2022-25: league mean pull is positive for BOTH hands (L +6.8..+7.5, R +3.2..+3.6)
+    and home runs sit at +16..+20 for both, ~80% on the pull side."""
+    assert bbe["stand"].null_count() == 0, "stand must be non-null (it is per-EVENT)"
+    return bbe.with_columns(
+        stand_R=(pl.col("stand") == "R").cast(pl.Float64),
+        phi_raw=pl.arctan2(pl.col("hc_x") - HOME_PLATE_X,
+                           HOME_PLATE_Y - pl.col("hc_y")).degrees(),
+    ).with_columns(
+        spray_obs=pl.when(pl.col("stand") == "R").then(-pl.col("phi_raw"))
+                    .otherwise(pl.col("phi_raw")),
+        _ev_bin=(pl.col("launch_speed") // SPRAY_EV_BIN).cast(pl.Int32),
+        _la_bin=(pl.col("launch_angle") // SPRAY_LA_BIN).cast(pl.Int32),
+    )
+
+
+def spray_impute_table(bbe: pl.DataFrame) -> tuple[pl.DataFrame, dict[float, float]]:
+    """Median pull-relative spray by (ev_bin, la_bin, stand_R), plus a per-hand
+    fallback. Build this on the TRAINING seasons only and apply it to both train and
+    holdout, so the holdout never imputes itself."""
+    d = _spray_cols(bbe).drop_nulls("spray_obs")
+    cell = (
+        d.group_by("_ev_bin", "_la_bin", "stand_R")
+        .agg(spray_cell=pl.col("spray_obs").median(), _n=pl.len())
+        .filter(pl.col("_n") >= SPRAY_MIN_CELL)
+        .drop("_n")
+        .sort("_ev_bin", "_la_bin", "stand_R")     # polars group_by is not order-stable
+    )
+    hand = {float(k): float(v) for k, v in
+            d.group_by("stand_R").agg(m=pl.col("spray_obs").median()).iter_rows()}
+    return cell, hand
+
+
+def add_spray(bbe: pl.DataFrame, cell: pl.DataFrame,
+              hand: dict[float, float]) -> pl.DataFrame:
+    """Add phi_raw, spray_pull (POSITIVE = pulled, both hands), stand_R, hc_imputed.
+
+    Rows with null hc_x/hc_y (0.034-0.043% of BBE, 2022-25) are IMPUTED, never dropped
+    -- dropping would move the holdout event count off 122,006 and make the -80107 ELPD
+    anchor incomparable. Fallback ladder: (ev, la, stand) cell median -> per-hand median
+    -> 0.0. hc_imputed is an AUDIT column, deliberately not a BART feature: at ~45 rows
+    a season a flag feature is split noise, and five features is the design's spec."""
+    d = _spray_cols(bbe).join(cell, on=["_ev_bin", "_la_bin", "stand_R"], how="left")
+    fallback = (pl.when(pl.col("stand_R") == 1.0).then(pl.lit(hand.get(1.0, 0.0)))
+                  .otherwise(pl.lit(hand.get(0.0, 0.0))))
+    out = d.with_columns(
+        hc_imputed=pl.col("spray_obs").is_null(),
+        spray_pull=pl.coalesce(pl.col("spray_obs"), pl.col("spray_cell"), fallback),
+    ).drop("spray_obs", "spray_cell", "_ev_bin", "_la_bin")
+    assert out["spray_pull"].null_count() == 0, "spray_pull must be fully imputed"
+    return out
+
+
 def build_non_bbe_pa(df: pl.DataFrame) -> pl.DataFrame:
     """Walks, HBP, strikeouts, catcher's interference: woba_denom == 1 and type != 'X'."""
     return (
