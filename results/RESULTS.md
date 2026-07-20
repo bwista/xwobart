@@ -218,6 +218,115 @@ the extra data only tightened R-hat (1.67 → 1.17).
   1.17 as data grows) and is not a meaningful convergence signal — `verify_oos_mechanism`
   (corr ~1.0) gates real convergence. Approved at the Stage A review gate.
 
+### Phase 2 Stages 2–3 (2026-07-20)
+
+- `FEATURES` split into `FEATURES_V0` / `FEATURES_SPRAY`; `build_features` takes the
+  column list, so **one** orchestrator serves both variants and protocol parity with the
+  frozen anchor is structural rather than aspirational (`run_v0.py --variant`).
+- `stand` enters BART as a numeric `stand_R` (1.0/0.0) column, not the raw string.
+- The design's hc missing-flag is an **audit column, not a BART feature** (0.034–0.043%
+  missingness; a flag feature would be split noise and would make it a 6-feature model).
+- Spray imputation uses the conditional **median**, not the spec's conditional **mean**,
+  because ~9% of BBE sit outside the foul lines in hc coordinates (|φ_raw| > 45°, caught
+  fouls) and the mean is sensitive to that tail.
+- Level 2 was re-run in **Stage 2, not Stage 3**: `run_talent2.py` consumes public Savant
+  per-event xwOBA and never touches the surface, so a refit provably cannot move it — but
+  the cache rebuild could, so the re-run belongs to the rebuild's gate.
+- **`all_trees` must be materialized before pickling.** pymc-bart stores the fitted trees
+  in a `multiprocessing.Manager` ListProxy (`pymc_bart/bart.py:143`), so
+  `pickle.dump(all_trees)` writes a ~208-byte connection token that raises
+  `FileNotFoundError` once the manager process dies. `pickle.dump(list(all_trees))` yields
+  a real, reloadable pickle. Caught by the Stage-A smoke, not by reasoning.
+- **Task 8 was split into two processes** (`run_v0.py --variant spray`, then
+  `scripts/marginalize_spray.py`), which the pickle fix above makes possible: the plan
+  required one 60-minute invocation only because the trees were thought unrecoverable.
+  The from-pickle prediction path was verified against the in-process path at corr
+  0.99989 / mean|diff| 0.0027 — the same thresholds `verify_oos_mechanism` uses.
+- The rollup A/B races the two rollups **directly** against next-season wOBA rather than
+  feeding both through Level 2 (spec §"Rollup choice under spray"). Level 2 currently
+  consumes public Savant per-event xwOBA, so wiring the model rollup into it is itself
+  Stage-4 work; the direct race answers the same question. Stage 4 should confirm the
+  choice survives the talent layer.
+- `results/rollup_ab/figures/` uses two **lightness steps of the model hue** for the two
+  rollups rather than two competing hues. Four separable categorical hues do not exist
+  alongside the repo's fixed blue=model / orange=Savant mapping — the obvious 4th (green)
+  sits at ΔE 4.0 from Savant's orange under deuteranopia. The two rollups are one entity
+  in two configurations, so a lightness pair is also the semantically correct encoding.
+  Every bar carries a direct value label (the two low-chroma slots fall below 3:1 contrast
+  on white, which obligates visible labels).
+
+## Sampler reproducibility — measured, and it bounds every surface comparison
+
+**pymc-bart 0.12 fits are not reproducible across processes, despite `random_seed=42`.**
+Three back-to-back Stage-A runs on bit-identical inputs returned ELPD −14,299 / −14,375 /
+−13,819 (a 556-nat spread over 20,000 events). The tell is that **R-hat itself moves**
+(1.37 ↔ 1.83): R-hat is a deterministic function of the draws given a fixed probe seed, so
+the *draws* differ, not the inputs. Input identity was proved separately — `X_fit` is
+bit-equal at both the 5,000- and 100,000-row subsample sizes, and the rebuilt caches match
+the pre-rebuild backup row-for-row.
+
+At the scale that matters, the noise is much smaller. A **v0 Stage-C replicate** — identical
+code, identical inputs, run in the same session as this table:
+
+| | holdout ELPD (122,006 events) |
+|---|---|
+| frozen v0 anchor | **−80,107.5** (SE 243.6) |
+| v0 replicate | **−79,840.4** (SE 245.8) |
+| run-to-run delta | **+267.1 nats** = 1.10 × anchor SE = +0.0022 / event |
+
+Consequences, and they are not optional reading:
+
+1. **Gate E1's ≥1000-nat bar is 3.74× the measured null noise**, so it survives — a gain
+   that size cannot be a lucky draw.
+2. **The frozen anchor sits ~267 nats on the unlucky side of a fresh run.** Any surface
+   delta should therefore be reported against *both* the anchor and a same-session control,
+   not the anchor alone.
+3. **The grounder sprint slope is a noisy statistic** — 0.0023488 → 0.0009895 between two
+   identical runs. Do not over-read the E7 localization diagnostic.
+4. Never conclude "a refactor broke the v0 path" from moved metrics alone. Prove input
+   identity instead: `X_fit` bit-equality plus `fit_rows` / `predict_rows` / class
+   distribution / linear weights. The replicate also confirmed the `--variant` refactor at
+   full scale (fit rows 100,000; predict rows 363,595 / 122,006; VI indices `[1, 0, 2]` —
+   all identical to the anchor).
+
+## Phase 2 Stage 2 — spray cache rebuild + sign QC (COMPLETE)
+
+Full write-up: `results/stage2_rebuild/NOTES.md`. Reproduce with
+`scripts/rebuild_caches.py` then `scripts/qc_spray.py`.
+
+The slim caches now carry `hc_x`, `hc_y`, `stand` (15 → 18 columns), and
+`src/prep.add_spray` derives `spray_pull = ±atan2(hc_x − 125.42, 198.27 − hc_y)`, mirrored
+by `stand` so **positive always means pulled** for both hands.
+
+**Reproduction gates R1–R6: all PASS.** The one that matters most is R2 — the
+order-independent content digest over the pre-existing 15 columns came back
+**byte-identical on all four seasons**, so the upstream KIT cache had not moved and every
+frozen anchor in this repo survives the rebuild. R4 re-derived the Phase-1 talent table at
+`max|Δ|` of exactly **0.0** over 2,636 rows; R5 held BBE counts at 118,891 / 122,070 /
+122,634 / 122,006 (⇒ v0's 363,595 train + 122,006 holdout, so the ELPD anchor stays
+comparable); R6 reproduced Level 2 at r 0.469817 / 0.490783 to six decimals.
+
+**Sign-QC gates S1–S6: all PASS**, reproducing every planned anchor exactly — league mean
+pull L +6.84…+7.50 / R +3.23…+3.62, HR mean +16.3…+20.3 both hands, ~78–84% pull-side,
+Schwarber +13.90, Paredes +11.88, Mountcastle −5.16. S5, the gate that catches a
+modal-hand (rather than per-event) mirror, reports **+8.68 L / +5.60 R** on the 65
+switch-hitter batter-seasons — the correct-mirror row, and far from the simulated bug's
+−3.97.
+
+## Phase 2 Stage 3 — spray surface (NOT YET RUN)
+
+The 5-feature refit has **not** been executed; `results/stage_C_spray/` holds no metrics.
+All of its machinery is built, committed and smoke-tested end to end at Stage A
+(`results/stage_A_spray/`), and the two commands are:
+
+```bash
+.venv/bin/python scripts/run_v0.py --stage C --variant spray --acknowledge-runtime  # ~30 min
+.venv/bin/python scripts/marginalize_spray.py -M 9                                  # ~30 min
+.venv/bin/python scripts/rollup_ab.py                                               # seconds
+```
+
+Gates E1–E8 are unscored until then.
+
 <!-- stage_A_spray -->
 ## Stage A_spray
 - kit_sha: fcbb78a | seed: 42 | fit rows: 5000 | predict rows: {'train': 20000, 'holdout': 20000, 'capped': True}
