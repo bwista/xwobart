@@ -1,12 +1,14 @@
 import numpy as np
 import polars as pl
 
-from src.talent import eb_fit, eb_shrink
+from src.talent import build_pa_values, build_talent_table, eb_fit, eb_shrink
 from src.talent2 import (
     FLOOR_SD_PER_PA,
+    MIN_BBE,
     assemble_measurements,
     bootstrap_S,
     build_pa_measurements,
+    build_talent2_table,
     mvn_mle,
     mvn_posterior,
     player_measurements,
@@ -207,3 +209,80 @@ def test_mvn_posterior_peripheral_pull_and_information_gain():
     t1, v1 = mvn_posterior(z[:, :1], S[:, :1, :1], mu[:, :1], C[:1, :1],
                            np.zeros(2, int))
     assert var0[0] < v1[0]             # peripherals resolve xwOBA-talent variance
+
+
+def _synthetic_league(n_players=150, seed=11):
+    rng = np.random.default_rng(seed)
+    rows = []
+    for batter in range(n_players):
+        talent_ev = rng.normal(89, 3)
+        talent_x = 0.31 + 0.012 * (talent_ev - 89) + rng.normal(0, 0.02)
+        n_pa = int(rng.integers(4, 500))
+        # Guarantee the 1-D fallback is exercised rather than left to the draw:
+        # at n_pa <= 4, n_bbe < MIN_BBE (=5) by construction, whatever the RNG does.
+        if batter < 2:
+            n_pa = 4
+
+        for _ in range(n_pa):
+            bbe = rng.random() < 0.7
+            ev = rng.normal(talent_ev, 7) if bbe else None
+            val = float(np.clip(rng.normal(talent_x, 0.45), 0, 2)) if bbe else \
+                  float(rng.random() < 0.3) * 0.7
+            rows.append({
+                "batter": batter, "game_year": 2024, "type": "X" if bbe else "S",
+                "launch_speed": ev,
+                "launch_speed_angle": (6.0 if (bbe and ev > 99) else 3.0) if bbe else None,
+                "estimated_woba_using_speedangle": val if bbe else None,
+                "woba_value": val, "woba_denom": 1,
+            })
+    return pl.DataFrame(rows)
+
+
+def test_build_talent2_table_structure_and_fallback():
+    pitches = _synthetic_league()
+    pam = build_pa_measurements(pitches)
+    meas, S = assemble_measurements(pam, B=200, seed=2)
+    tbl, hypers = build_talent2_table(meas, S, fit_min_pa=100)
+    need = {"batter", "season", "PA", "n_bbe", "xwoba_raw", "avg_ev",
+            "barrel_rate", "xwoba_talent2", "talent2_var", "talent2_lo",
+            "talent2_hi", "reliability2", "used_dims"}
+    assert need.issubset(tbl.columns) and tbl.height == meas.height
+    assert set(tbl["used_dims"].unique().to_list()) <= {"3d", "1d"}
+    # the fallback path must actually be exercised, not vacuously true
+    tiny = tbl.filter(pl.col("n_bbe") < MIN_BBE)
+    assert tiny.height > 0 and tiny["used_dims"].eq("1d").all()
+    assert tbl["talent2_lo"].lt(tbl["talent2_hi"]).all()
+    assert 0.25 < hypers["mu"][0][0] < 0.40          # xwOBA league mean, unstd
+    # positive xwOBA/EV talent correlation was built in -> recovered sign
+    assert hypers["Sigma"][0][1] > 0
+
+
+def test_build_talent2_table_1d_matches_phase1():
+    pitches = _synthetic_league()
+    pam = build_pa_measurements(pitches)
+    meas, S = assemble_measurements(pam, B=400, seed=2)
+    tbl, _ = build_talent2_table(meas, S, dims=("xwoba",), fit_min_pa=100)
+    p1 = build_talent_table(build_pa_values(pitches), fit_min_pa=100)
+    j = tbl.join(p1.select("batter", "season", "xwoba_talent"),
+                 on=["batter", "season"], how="inner")
+    assert j.height == tbl.height
+    d = (j["xwoba_talent2"] - j["xwoba_talent"]).abs()
+    r = np.corrcoef(j["xwoba_talent2"].to_numpy(), j["xwoba_talent"].to_numpy())[0, 1]
+    assert r > 0.995 and d.median() < 0.005
+
+
+def test_build_talent2_table_peripheral_pull_at_low_pa():
+    # In the synthetic league, xwOBA talent tracks EV talent. Among LOW-PA
+    # players, the 3-D posterior must move high-EV players up relative to the
+    # 1-D (Phase-1-style) shrink of the same xwOBA measurement.
+    pitches = _synthetic_league(seed=13)
+    pam = build_pa_measurements(pitches)
+    meas, S = assemble_measurements(pam, B=200, seed=2)
+    t3, _ = build_talent2_table(meas, S, fit_min_pa=100)
+    t1, _ = build_talent2_table(meas, S, dims=("xwoba",), fit_min_pa=100)
+    j = (t3.select("batter", "PA", "avg_ev", "n_bbe", t2=pl.col("xwoba_talent2"))
+           .join(t1.select("batter", t1c=pl.col("xwoba_talent2")), on="batter")
+           .filter((pl.col("PA") < 80) & (pl.col("n_bbe") >= 5)))
+    hi = j.filter(pl.col("avg_ev") > j["avg_ev"].quantile(0.8))
+    lo = j.filter(pl.col("avg_ev") < j["avg_ev"].quantile(0.2))
+    assert (hi["t2"] - hi["t1c"]).mean() > (lo["t2"] - lo["t1c"]).mean()

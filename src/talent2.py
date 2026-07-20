@@ -190,3 +190,81 @@ def mvn_posterior(z: np.ndarray, S: np.ndarray, mu: np.ndarray,
     theta = mu[season_idx] + np.einsum("nij,nj->ni", A, diff)
     V0 = Sigma[0, 0] - np.einsum("nj,j->n", A[:, 0, :], Sigma[:, 0])
     return theta, np.maximum(V0, 0.0)
+
+
+def build_talent2_table(meas: pl.DataFrame, S_all: np.ndarray,
+                        dims: tuple[str, ...] = DIMS, fit_min_pa: int = 100,
+                        zero_offdiag: bool = False,
+                        fit_seasons: list[int] | None = None
+                        ) -> tuple[pl.DataFrame, dict]:
+    """Assemble the Level-2 talent table. Hyperparameters (per-season mu, shared
+    Sigma) are fit by marginal MLE on the stable population (PA >= fit_min_pa,
+    valid measurements), standardized per dim; posteriors are computed for every
+    row. Rows without usable peripherals (n_bbe < MIN_BBE, missing values, or a
+    failed bootstrap) fall back to the 1-D xwOBA-only model with the analytic
+    se2 (floored) — i.e., exactly Phase 1's machinery. zero_offdiag drops the
+    S_i off-diagonals (the shared-noise diagnostic; NOT for production).
+    fit_seasons restricts the HYPERPARAMETER fit to those seasons (posteriors
+    still computed for all rows) — the leakage-sensitivity check; default None
+    fits on all seasons, matching Phase 1's convention."""
+    assert dims[0] == "xwoba"
+    d_idx = [DIMS.index(d) for d in dims]
+    D = len(d_idx)
+    seasons = sorted(meas["season"].unique().to_list())
+    t_idx = np.array([seasons.index(s) for s in meas["season"].to_list()])
+    z = meas.select("xwoba_raw", "avg_ev", "barrel_rate").to_numpy()[:, d_idx]
+    S = S_all[:, d_idx][:, :, d_idx].copy()
+    if zero_offdiag:
+        S = S * np.eye(D)[None]
+
+    ok = meas["s_ok"].to_numpy() & np.isfinite(z).all(axis=1) \
+        & np.isfinite(S).all(axis=(1, 2))
+    if D > 1:
+        ok &= meas["n_bbe"].to_numpy() >= MIN_BBE
+
+    pa = meas["PA"].to_numpy()
+    fit = ok & (pa >= fit_min_pa)
+    if fit_seasons is not None:
+        fit &= np.isin(meas["season"].to_numpy(), fit_seasons)
+    center = z[fit].mean(axis=0)
+    scale = z[fit].std(axis=0, ddof=1)
+    assert (scale > 0).all()
+    zs = (z - center) / scale
+    Ss = S / np.outer(scale, scale)[None]
+
+    mu, Sigma = mvn_mle(zs[fit], Ss[fit], t_idx[fit], len(seasons))
+
+    theta0 = np.empty(len(meas))
+    var0 = np.empty(len(meas))
+    th, v = mvn_posterior(zs[ok], Ss[ok], mu, Sigma, t_idx[ok])
+    theta0[ok], var0[ok] = th[:, 0], v
+
+    if (~ok).any():                     # 1-D fallback on the analytic se2, floored
+        n_arr = meas["n"].to_numpy().astype(float)
+        se2 = np.maximum(np.nan_to_num(meas["se2"].to_numpy(), nan=np.inf),
+                         FLOOR_SD_PER_PA ** 2 / n_arr)
+        z1 = (meas["xwoba_raw"].to_numpy()[~ok, None] - center[0]) / scale[0]
+        S1 = (se2[~ok] / scale[0] ** 2)[:, None, None]
+        th1, v1 = mvn_posterior(z1, S1, mu[:, :1], Sigma[:1, :1], t_idx[~ok])
+        theta0[~ok], var0[~ok] = th1[:, 0], v1
+
+    talent = center[0] + theta0 * scale[0]
+    var = var0 * scale[0] ** 2
+    half = Z90 * np.sqrt(var)
+    hypers = {
+        "dims": list(dims), "seasons": seasons,
+        "mu": (center + mu * scale).tolist(),
+        "Sigma": (Sigma * np.outer(scale, scale)).tolist(),
+        "center": center.tolist(), "scale": scale.tolist(),
+        "n_fit": int(fit.sum()), "n_fallback_1d": int((~ok).sum()),
+        "zero_offdiag": zero_offdiag, "fit_seasons": fit_seasons,
+    }
+    tbl = meas.with_columns(
+        xwoba_talent2=pl.Series(talent),
+        talent2_var=pl.Series(var),
+        talent2_lo=pl.Series(talent - half),
+        talent2_hi=pl.Series(talent + half),
+        reliability2=pl.Series(1.0 - var0 / Sigma[0, 0]),
+        used_dims=pl.Series(np.where(ok, "3d" if D > 1 else "1d", "1d")),
+    )
+    return tbl, hypers
