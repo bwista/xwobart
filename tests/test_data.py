@@ -61,3 +61,52 @@ def test_sprint_merge_is_per_season():
     })
     out, _ = merge_sprint_speed(bbe, sprint)
     assert out.sort("game_year")["sprint_speed"].to_list() == [29.0, 27.0]
+
+
+from src.data import KEEP_COLUMNS, cache_fingerprint
+
+PRE_REBUILD_COLUMNS = [
+    "game_pk", "game_date", "game_year", "batter", "events", "description",
+    "des", "type", "bb_type", "launch_speed", "launch_angle",
+    "launch_speed_angle", "estimated_woba_using_speedangle",
+    "woba_value", "woba_denom",
+]
+
+
+def test_keep_columns_adds_spray_inputs_without_removing_anything():
+    assert KEEP_COLUMNS[:len(PRE_REBUILD_COLUMNS)] == PRE_REBUILD_COLUMNS
+    assert KEEP_COLUMNS[len(PRE_REBUILD_COLUMNS):] == ["hc_x", "hc_y", "stand"]
+
+
+def _fp_frame(tmp_path, extra=None, vals=(1, 2, 3)):
+    d = {"a": list(vals), "b": ["x", "y", "z"]}
+    if extra:
+        d |= extra
+    # The filename MUST discriminate on content: two frames differing only in `vals`
+    # would otherwise collide and silently overwrite each other, making the
+    # changed-value assertion below compare a file to itself and always fail.
+    p = tmp_path / f"f{len(d)}_{'-'.join(map(str, vals))}.parquet"
+    pl.DataFrame(d).write_parquet(p)
+    return p
+
+
+def test_fingerprint_ignores_added_columns(tmp_path):
+    p1 = _fp_frame(tmp_path)
+    p2 = _fp_frame(tmp_path, extra={"c": [9.0, 9.0, 9.0]})
+    assert cache_fingerprint(p1, ["a", "b"]) == cache_fingerprint(p2, ["a", "b"])
+
+
+def test_fingerprint_ignores_row_order(tmp_path):
+    p1 = _fp_frame(tmp_path, vals=(1, 2, 3))
+    p2 = tmp_path / "rev.parquet"
+    pl.read_parquet(p1).reverse().write_parquet(p2)
+    assert cache_fingerprint(p1, ["a", "b"]) == cache_fingerprint(p2, ["a", "b"])
+
+
+def test_fingerprint_detects_a_changed_value_and_a_changed_row_count(tmp_path):
+    p1 = _fp_frame(tmp_path, vals=(1, 2, 3))
+    p2 = _fp_frame(tmp_path, vals=(1, 2, 4))
+    assert cache_fingerprint(p1, ["a", "b"])["digest"] != cache_fingerprint(p2, ["a", "b"])["digest"]
+    p3 = tmp_path / "short.parquet"
+    pl.read_parquet(p1).head(2).write_parquet(p3)
+    assert cache_fingerprint(p3, ["a", "b"])["n_rows"] == 2

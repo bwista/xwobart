@@ -3,6 +3,7 @@ via kinferencetoolkit's loader — no pybaseball.statcast() pulls (spec §5.1). 
 network pulls are the two seasonal leaderboards (sprint speed, expected stats)."""
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -17,6 +18,9 @@ KEEP_COLUMNS = [
     "des", "type", "bb_type", "launch_speed", "launch_angle",
     "launch_speed_angle", "estimated_woba_using_speedangle",
     "woba_value", "woba_denom",
+    # Phase 2 Stage 2: spray angle inputs. hc_x/hc_y are the hit coordinates;
+    # stand is the batter's side FOR THAT EVENT (switch hitters change it mid-season).
+    "hc_x", "hc_y", "stand",
 ]
 
 
@@ -139,6 +143,18 @@ def fetch_sprint_speed(cfg: Config, force: bool = False) -> pl.DataFrame:
         out.write_parquet(cache)
         frames.append(out)
     return pl.concat(frames)
+
+
+def cache_fingerprint(path: Path, columns: list[str]) -> dict:
+    """Row count + an order-independent content digest over `columns` in one slim cache.
+
+    Proves that adding columns to KEEP_COLUMNS changed no pre-existing value (Stage-2
+    gate R2). Order independence is deliberate: a pure row-order change is not a data
+    change, and neither parquet IO nor polars group_by guarantees stable ordering."""
+    df = pl.read_parquet(path, columns=columns)
+    h = df.hash_rows(seed=0).sort()
+    return {"n_rows": df.height,
+            "digest": hashlib.sha256(h.to_numpy().tobytes()).hexdigest()[:16]}
 
 
 def fetch_expected_stats(cfg: Config, force: bool = False) -> pl.DataFrame:
