@@ -54,7 +54,7 @@
     {
       "id": 8,
       "subject": "Task 8: Stage-C spray refit — the ELPD gate E1-E8 (~60 min)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         7
       ]
@@ -62,7 +62,7 @@
     {
       "id": 9,
       "subject": "Task 9: Spray-conditioned vs spray-marginalized rollup A/B (E8)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         8
       ]
@@ -70,7 +70,7 @@
     {
       "id": 10,
       "subject": "Task 10: Documentation + final verification",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         9
       ]
