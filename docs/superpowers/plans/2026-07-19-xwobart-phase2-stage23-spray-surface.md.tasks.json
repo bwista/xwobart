@@ -1,16 +1,80 @@
 {
   "planPath": "docs/superpowers/plans/2026-07-19-xwobart-phase2-stage23-spray-surface.md",
   "tasks": [
-    {"id": 1, "subject": "Task 1: Spray angle derivation + imputation table (TDD)", "status": "pending"},
-    {"id": 2, "subject": "Task 2: Variant-aware feature list (TDD)", "status": "pending", "blockedBy": [1]},
-    {"id": 3, "subject": "Task 3: KEEP_COLUMNS + cache fingerprint (TDD)", "status": "pending"},
-    {"id": 4, "subject": "Task 4: Rebuild caches behind reproduction gates R1-R6", "status": "pending", "blockedBy": [3]},
-    {"id": 5, "subject": "Task 5: Spray sign QC gates S1-S6 (before the fit)", "status": "pending", "blockedBy": [1, 4]},
-    {"id": 6, "subject": "Task 6: Variant-aware evaluation helpers (TDD)", "status": "pending"},
-    {"id": 7, "subject": "Task 7: Wire --variant spray into run_v0 + draw persistence + marginalization", "status": "pending", "blockedBy": [2, 5, 6]},
-    {"id": 8, "subject": "Task 8: Stage-C spray refit — the ELPD gate E1-E8 (~60 min)", "status": "pending", "blockedBy": [7]},
-    {"id": 9, "subject": "Task 9: Spray-conditioned vs spray-marginalized rollup A/B (E8)", "status": "pending", "blockedBy": [8]},
-    {"id": 10, "subject": "Task 10: Documentation + final verification", "status": "pending", "blockedBy": [9]}
+    {
+      "id": 1,
+      "subject": "Task 1: Spray angle derivation + imputation table (TDD)",
+      "status": "completed"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Variant-aware feature list (TDD)",
+      "status": "completed",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: KEEP_COLUMNS + cache fingerprint (TDD)",
+      "status": "completed"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Rebuild caches behind reproduction gates R1-R6",
+      "status": "completed",
+      "blockedBy": [
+        3
+      ]
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Spray sign QC gates S1-S6 (before the fit)",
+      "status": "pending",
+      "blockedBy": [
+        1,
+        4
+      ]
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Variant-aware evaluation helpers (TDD)",
+      "status": "pending"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Wire --variant spray into run_v0 + draw persistence + marginalization",
+      "status": "pending",
+      "blockedBy": [
+        2,
+        5,
+        6
+      ]
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Stage-C spray refit — the ELPD gate E1-E8 (~60 min)",
+      "status": "pending",
+      "blockedBy": [
+        7
+      ]
+    },
+    {
+      "id": 9,
+      "subject": "Task 9: Spray-conditioned vs spray-marginalized rollup A/B (E8)",
+      "status": "pending",
+      "blockedBy": [
+        8
+      ]
+    },
+    {
+      "id": 10,
+      "subject": "Task 10: Documentation + final verification",
+      "status": "pending",
+      "blockedBy": [
+        9
+      ]
+    }
   ],
-  "lastUpdated": "2026-07-19"
+  "lastUpdated": "2026-07-20T00:00:00Z"
 }

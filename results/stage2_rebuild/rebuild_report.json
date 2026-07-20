@@ -1,0 +1,98 @@
+{
+  "before": {
+    "2022": {
+      "n_rows": 686248,
+      "digest": "705b37fc8201eaea"
+    },
+    "2023": {
+      "n_rows": 713552,
+      "digest": "0dbab67411c3c34f"
+    },
+    "2024": {
+      "n_rows": 709231,
+      "digest": "059257d47fac522e"
+    },
+    "2025": {
+      "n_rows": 709727,
+      "digest": "3ab16780a3a3ee7e"
+    }
+  },
+  "after": {
+    "2022": {
+      "n_rows": 686248,
+      "digest": "705b37fc8201eaea"
+    },
+    "2023": {
+      "n_rows": 713552,
+      "digest": "0dbab67411c3c34f"
+    },
+    "2024": {
+      "n_rows": 709231,
+      "digest": "059257d47fac522e"
+    },
+    "2025": {
+      "n_rows": 709727,
+      "digest": "3ab16780a3a3ee7e"
+    }
+  },
+  "new_columns": {
+    "2022": {
+      "stand_null_rate_bbe": 0.0,
+      "hc_null_rate_bbe": 0.00035699460356994605
+    },
+    "2023": {
+      "stand_null_rate_bbe": 0.0,
+      "hc_null_rate_bbe": 0.0004453477356091952
+    },
+    "2024": {
+      "stand_null_rate_bbe": 0.0,
+      "hc_null_rate_bbe": 0.0003865979381443299
+    },
+    "2025": {
+      "stand_null_rate_bbe": 0.0,
+      "hc_null_rate_bbe": 0.00036862223433155165
+    }
+  },
+  "bbe_counts": {
+    "2022": 118891,
+    "2023": 122070,
+    "2024": 122634,
+    "2025": 122006
+  },
+  "gates": [
+    {
+      "name": "R1.rows",
+      "pass": true,
+      "detail": "{2022: (686248, 686248), 2023: (713552, 713552), 2024: (709231, 709231), 2025: (709727, 709727)}"
+    },
+    {
+      "name": "R2.digest",
+      "pass": true,
+      "detail": "{2022: ('705b37fc8201eaea', '705b37fc8201eaea'), 2023: ('0dbab67411c3c34f', '0dbab67411c3c34f'), 2024: ('059257d47fac522e', '059257d47fac522e'), 2025: ('3ab16780a3a3ee7e', '3ab16780a3a3ee7e')}"
+    },
+    {
+      "name": "R3.new_columns",
+      "pass": true,
+      "detail": "{2022: {'stand_null_rate_bbe': 0.0, 'hc_null_rate_bbe': 0.00035699460356994605}, 2023: {'stand_null_rate_bbe': 0.0, 'hc_null_rate_bbe': 0.0004453477356091952}, 2024: {'stand_null_rate_bbe': 0.0, 'hc_null_rate_bbe': 0.0003865979381443299}, 2025: {'stand_null_rate_bbe': 0.0, 'hc_null_rate_bbe': 0.00036862223433155165}}"
+    },
+    {
+      "name": "R4.phase1",
+      "pass": true,
+      "detail": "rows 2636 (want 2636), joined 2636, max|delta| 0.000e+00"
+    },
+    {
+      "name": "R5.bbe_counts",
+      "pass": true,
+      "detail": "{2022: 118891, 2023: 122070, 2024: 122634, 2025: 122006} vs frozen {2022: 118891, 2023: 122070, 2024: 122634, 2025: 122006}"
+    },
+    {
+      "name": "R6.level2",
+      "pass": true,
+      "detail": "exit 0, r30 0.469817 (want 0.469817), r100 0.490783 (want 0.490783)"
+    }
+  ],
+  "level2": {
+    "r30": 0.46981715457462436,
+    "r100": 0.49078312334037194
+  }
+}
