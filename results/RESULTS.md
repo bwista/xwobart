@@ -388,8 +388,66 @@ for a future stage — **match capacity (raise `m_trees`) and re-run both varian
 new setting**, comparing spray-vs-v0 at equal capacity rather than against a frozen
 3-feature anchor. That is a new experiment with its own anchor, not a rescue of this one.
 
-Design risk 2 (spray conditioning credits spray *luck*) is now moot for rollup selection:
-with the surface not beating v0, there is no spray-conditioned rollup worth promoting.
+### Rollup A/B (E8) — design risk 2 is CONFIRMED
+
+`results/rollup_ab/` · full write-up in `results/rollup_ab/NOTES.md`. Season-T rollup vs
+season-(T+1) **actual** wOBA, calibrated RMSE (×10⁻³, lower is better):
+
+| pool | n | conditioned | marginalized | v0 (3-feature) | Savant |
+|---|---|---|---|---|---|
+| PA ≥ 30 | 1,183 | 36.59 | 36.27 | **35.82** | **35.56** |
+| PA ≥ 100 | 1,072 | 35.44 | 35.07 | **34.59** | **34.45** |
+
+**Conditioning the rollup on per-ball spray direction is reliably counterproductive.**
+Marginalizing spray out (9 equal-mass league quantiles per EV × LA × stand cell) beats
+conditioning in 7 of 8 band/pair splits; the paired bootstrap (5,000 reps, seed 42) puts
+`conditioned − marginalized` at **+0.000317** [+0.000189, +0.000458] at PA ≥ 30 with
+conditioned winning **0 of 5,000** resamples. The *direction* is as resolved as a bootstrap
+can make it; the *magnitude* (~0.0003) is below this plan's 0.001 practical bar. Both
+statements hold — report them together.
+
+So: prefer **marginalized**. But the choice is academic here, because **both spray rollups
+lose to v0 in every band and every season pair**, which is exactly what E1's failure
+predicts. There is no spray rollup worth promoting into the talent layer, and Stage 4's
+premise as written (push the A/B winner through Level 2) needs rethinking first.
+
+The design also predicted a descriptive/predictive **inversion** (conditioned describes
+better, predicts worse). Not observed: same-season correlation with Savant at PA ≥ 100 is
+conditioned 0.901 < marginalized 0.921 < v0 0.948 — conditioned agrees least *and* predicts
+worst. Caveat on reading that: Savant is spray-blind, so a spray-conditioned rollup drifts
+from it mechanically; low agreement is not itself evidence of worse description. Testing the
+inversion properly needs same-season *actual* wOBA as the target — a different experiment.
+
+### Persisted per-event draws (E6) — location, contract, and a caveat that must travel with them
+
+`results/stage_C_spray/` (all gitignored — ~390 MB of draws plus a 27.6 MB trees pickle):
+
+| file | shape | meaning |
+|---|---|---|
+| `ev_draws_{train,holdout}.npy` | (200, 363,595) / (200, 122,006) f32 | spray-conditioned per-event value draws |
+| `ev_marginalized_{train,holdout}.npy` | (363,595) / (122,006) f32 | spray-marginalized per-event values |
+| `ev_draws_keys_{train,holdout}.parquet` | 363,595 / 122,006 rows | `row`, `batter`, `season`, `woba_denom` + the 5 features + `hc_imputed` |
+| `lppd_i_holdout.npy` | (122,006) f64 | per-event holdout log-likelihood |
+| `all_trees.pkl` | 27.6 MB | materialized fitted trees (see the deviation note) |
+
+**Alignment is positional**: axis 1 of `ev_draws_{tag}.npy` ↔ the row order of
+`ev_draws_keys_{tag}.parquet`, whose `row` column is that index. `metrics.json` also stamps a
+`batter_order_digest` per split so a reordering is detectable rather than merely
+contractual. When concatenating train + holdout, drop `row` first — it restarts at 0 in each
+file.
+
+**Surface-uncertainty caveat (spec Risk 3) — this must travel with the `.npy` files, because
+Stage 4 is a separate plan and a separate session.** The between-draw variance of these
+arrays is exactly right for *per-player* intervals. It is **not** valid for league-aggregate
+claims: surface errors are **correlated across players in the same feature region**, so
+summing or averaging these intervals across players understates the true uncertainty. A
+league-level statement needs the per-draw refit variant, not these draws.
+
+**Localization is not like-for-like under `--variant spray`.**
+`metrics["localization"]["grounder_slope_per_ftps"]` is the **pulled**-grounder slope (the
+spray grids are RHB at ±20°), so it cannot be compared directly to v0's spray-blind
+0.0023488. And per the reproducibility section above, that slope moved 0.0023488 → 0.0009895
+between two *identical* v0 runs — it is too noisy to carry an argument either way.
 
 <!-- stage_A_spray -->
 ## Stage A_spray

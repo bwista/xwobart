@@ -1107,5 +1107,15 @@
       "batter_order_digest": "35184af650b084b9"
     }
   },
-  "total_runtime_s": 1797.8565003748517
+  "total_runtime_s": 1797.8565003748517,
+  "marginalize_spray": {
+    "M": 9,
+    "sparse_cell_rate": {
+      "train": 0.004664530590354653,
+      "holdout": 0.005557103748995951
+    },
+    "mean_abs_shift_train": 0.026499912658398742,
+    "from_pickled_trees": true,
+    "runtime_s": 1562.4899879589211
+  }
 }
