@@ -1,5 +1,42 @@
 # xwobart Phase 2 — BART-informed contact-quality prior (ROADMAP)
 
+> ## ⚠️ SUPERSEDED 2026-07-19 — read this block before using anything below
+>
+> This roadmap's two candidate designs were both killed, one empirically and one at design
+> review. The text below is kept **for history only**; it is not the plan of record.
+>
+> - **"Shrink toward the model's own xwOBA" — killed empirically.** A structural no-op: the
+>   BART surface is a function of the same batted balls the raw number is built from, so the
+>   residual between-player variance it leaves is τ_resid² ≈ 1e-4. There is nothing to shrink
+>   toward that the raw number does not already contain.
+> - **Event-level batter intercepts — rejected at design review.** That channel has
+>   year-to-year r ≈ 0.12. Modeling it is modeling noise.
+> - **What replaced them.** At 30–100 PA, peripherals out-predict raw xwOBA next season
+>   (barrel r 0.244, EV r 0.227 vs raw xwOBA r 0.179), so they belong in the **prior**,
+>   entering at the **player-season** level rather than the event level.
+>
+> **Plan of record:** `docs/superpowers/specs/2026-07-19-xwobart-phase2-design-response.md`
+> (two-level modular design; joint MVN at Level 2, no event-level batter effects).
+>
+> **Stage 1 — SHIPPED 2026-07-19.** Joint-MVN talent model over (xwOBA, avg EV, barrel rate):
+> `docs/superpowers/plans/2026-07-19-xwobart-phase2-level2-talent.md` → `src/talent2.py`,
+> `scripts/run_talent2.py`, `results/talent2/`. All hard gates pass (PA ≥ 30 r 0.4698 vs
+> Phase-1 0.4669; PA ≥ 100 0.4908, tying Savant; shared-noise tripwire clean at −0.0130), with
+> the gain unestablished — bootstrap CI straddles zero and the confirm season reverses sign.
+> Full accounting in `results/talent2/NOTES.md`.
+>
+> **Stages 2–4 — not yet planned.** (2) cache rebuild adding `hc_x`/`hc_y`/`stand` with
+> pull-mirrored spray angle and sign QC; (3) one 5-feature BART surface refit, ELPD against the
+> −80107 anchor; (4) fold the surface-draw variance into `S_i[0,0]`, spray-conditioned vs
+> spray-marginalized rollup A/B, and 50/80/90% interval-coverage validation by PA band.
+>
+> **The per-event persistence prerequisite below MOVES to Stage 3** and is upgraded: it must
+> persist per-event value **draws** (~100–200 thinned), not just means, so Stage 4 can fold the
+> surface variance in.
+>
+> Multi-season + age pooling at Level 2 is the flagged follow-on after Stage 4 — and per
+> Stage 1's notes, likely worth more than the peripherals were.
+
 > **Status: roadmap, NOT an executable plan.** This is the design and the decisions to
 > settle, not bite-sized tasks. Phase 2 requires a modeling decision and one BART re-fit, so
 > it must be run as its own **brainstorm → spec → plan → execute** cycle (like v0). Extracted

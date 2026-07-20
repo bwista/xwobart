@@ -125,6 +125,54 @@ Carried to Phase 2: the prior is the flat league mean (→ BART contact-quality 
 the interval is estimation-only (→ combine with BART's surface term). See
 `results/talent/NOTES.md`.
 
+## Level-2 talent model (joint MVN over xwOBA + peripherals)
+
+Phase 2 / Stage 1. Phase 1 shrinks every hitter toward the **season league mean**; Level 2
+shrinks him toward **what his contact quality implies**. The three stats are modeled as jointly
+noisy measurements of correlated latent talents — `z_i = (xwOBA, avg EV, barrel rate)_i ~
+N((θ_i,ξ_i), S_i)`, `(θ_i,ξ_i) ~ N(μ_season, Σ_talent)` — so the posterior
+`θ̂ = μ + Σ(Σ+S_i)⁻¹(z−μ)` leans on the fast-stabilizing peripherals exactly when the xwOBA
+sample is small. `S_i` is bootstrapped from the player's own PAs and **keeps its off-diagonals**
+(all three stats come from the same balls; ignoring that shared noise is what would manufacture
+fake low-PA gains). Closed-form throughout — no MCMC, no BART re-fit, ~7 s
+(`src/talent2.py`, `scripts/run_talent2.py --stage full`, `results/talent2/`). Fitted talent
+correlations: xwOBA/EV **+0.776**, xwOBA/barrel **+0.712**; xwOBA talent SD 0.0312 (Phase-1 τ
+0.0307–0.0323). 2,543 of 2,636 player-seasons use all three dims; 93 fall back to 1-D.
+
+**Validation (predict next-season actual wOBA, r; target-year PA ≥ 100):**
+
+| population | n | **Level 2** | Phase-1 talent | raw | Savant |
+|---|---|---|---|---|---|
+| pooled, PA_T ≥ 100 | 1060 | **0.4908** | 0.4886 | 0.4835 | 0.4908 |
+| pooled, PA_T ≥ 30 | 1173 | **0.4698** | 0.4669 | 0.4454 | 0.4521 |
+
+**Verdict: G3 (low-PA win) and G4 (high-PA non-inferiority) both PASS** — Level 2 beats Phase 1
+on r and calibrated RMSE at PA ≥ 30, beats Savant by 0.0177 there, and at PA ≥ 100 now *ties*
+Savant (0.4908) where Phase 1 trailed. The gain sits exactly where the design predicted, by PA
+band: **+0.0718** (30–60 PA), +0.0365 (60–100), +0.0166 (100–250), −0.0000 (250+). Unlike Phase
+1's per-band table, these gaps are real signal rather than affine-invariance noise — Level 2
+adds independent information inside the band.
+
+**But it is not statistically established, and the notes say so.** The paired bootstrap
+(5,000 reps, PA ≥ 30) gives Δr **+0.0029, CI95 [−0.0117, +0.0176]**, better in 64% of resamples;
+and the held-out confirmation season **reverses sign** (select 22→23 + 23→24: +0.0063; confirm
+24→25: −0.0034). Nothing was tuned on confirm to rescue it. Ships as an improvement in
+expectation, not a demonstrated one.
+
+**Gate outcomes.** G1 (reproduces Phase 1) PASS — corr **0.99950** on the 2,500 rows where both
+models should agree, anchors reproduced to 0.4885/0.4886 and 0.4663/0.4669. G2 (bootstrap vs
+analytic SE) PASS — corr 0.9965, median ratio 1.002. G3, G4 PASS. **G5 (shared-noise tripwire)
+CLEAN and decisive**: refitting with `S_i`'s off-diagonals zeroed does not inflate the gain, it
+destroys it (+0.0029 → **−0.0101**, worse than Phase 1; artifact gap −0.0130 against a +0.005
+alarm threshold) — the correlated-noise modeling is load-bearing and the win is not an artifact.
+G6 (honest split) followed; the disagreement is reported above, not dropped.
+
+Also closes **Phase-1 limitation 3**: a hitter with 2 PA and 2 outs has zero sample variance, so
+Phase 1 reported his true talent as exactly .000 with full confidence (Trevor Rogers, a pitcher,
+2025). A `(0.25)²/n` variance floor fixes 136 such rows; they are excluded from G1's correlation
+and reported separately under `l2a.floor_fix` rather than folded into a pass. See
+`results/talent2/NOTES.md`.
+
 ## Stage C decision (spec §15.3)
 
 From Stage B (14.2 min on 50k rows), full-train (~363k rows) extrapolates to ~100 min

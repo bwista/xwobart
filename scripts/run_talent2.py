@@ -313,7 +313,8 @@ def stage_full(cfg, meas: pl.DataFrame, S: np.ndarray, p1: pl.DataFrame,
         .join(act.select("batter", "season", "actual_woba"),
               on=["batter", "season"], how="inner")
         .with_columns(floor_binds=pl.col("se2_p1") < FLOOR_SD_PER_PA ** 2 / pl.col("n"))
-    )
+        .sort("batter", "season")   # pin join order: see make_pairs — without this the
+    )                               # written parquet and the scatter differ run to run
     assert base.height == P1_N_ROWS, f"base height {base.height} != {P1_N_ROWS}"
 
     sel_seasons = cfg.train_seasons[:-1]          # 2022, 2023 -> model-choice split

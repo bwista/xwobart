@@ -1,13 +1,16 @@
 {
   "planPath": "docs/superpowers/plans/2026-07-19-xwobart-phase2-level2-talent.md",
   "tasks": [
-    {"id": 1, "subject": "Task 1: Per-PA measurement frame (build_pa_measurements)", "status": "pending"},
-    {"id": 2, "subject": "Task 2: Measurement triples + bootstrap covariance S_i", "status": "pending", "blockedBy": [1]},
-    {"id": 3, "subject": "Task 3: Marginal-MLE hyperparameters + MVN conditional posterior", "status": "pending", "blockedBy": [2]},
-    {"id": 4, "subject": "Task 4: build_talent2_table — assembly, standardization, 1-D fallback", "status": "pending", "blockedBy": [3]},
-    {"id": 5, "subject": "Task 5: Runner L2a stage — regression gates vs Phase 1 (real data)", "status": "pending", "blockedBy": [4]},
-    {"id": 6, "subject": "Task 6: Runner L2b stage — validation races, ablations, tripwire, figures", "status": "pending", "blockedBy": [5]},
-    {"id": 7, "subject": "Task 7: Docs — NOTES.md, RESULTS.md section, roadmap supersession, final verify", "status": "pending", "blockedBy": [6]}
+    {"id": 1, "subject": "Task 1: Per-PA measurement frame (build_pa_measurements)", "status": "completed"},
+    {"id": 2, "subject": "Task 2: Measurement triples + bootstrap covariance S_i", "status": "completed", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Marginal-MLE hyperparameters + MVN conditional posterior", "status": "completed", "blockedBy": [2]},
+    {"id": 4, "subject": "Task 4: build_talent2_table — assembly, standardization, 1-D fallback", "status": "completed", "blockedBy": [3]},
+    {"id": 5, "subject": "Task 5: Runner L2a stage — regression gates vs Phase 1 (real data)", "status": "completed", "blockedBy": [4],
+     "note": "G1.match redefined (user-approved) to score the 2500 rows where the variance floor does not bind (corr 0.99950); the 136 floor-bound rows are reported under l2a.floor_fix as the intended fix of talent NOTES limitation 3."},
+    {"id": 6, "subject": "Task 6: Runner L2b stage — validation races, ablations, tripwire, figures", "status": "completed", "blockedBy": [5],
+     "note": "G3/G4 PASS; G5 tripwire clean (-0.0130). Honest caveats recorded: paired-bootstrap CI straddles zero, confirm season reverses sign. make_pairs and base now sorted — polars joins left row order unpinned, breaking bootstrap reproducibility and artifact idempotency."},
+    {"id": 7, "subject": "Task 7: Docs — NOTES.md, RESULTS.md section, roadmap supersession, final verify", "status": "completed", "blockedBy": [6],
+     "note": "48 tests pass; runner exits 0 and is byte-idempotent; all 22 headline numbers machine-verified against talent2_metrics.json."}
   ],
-  "lastUpdated": "2026-07-19"
+  "lastUpdated": "2026-07-19T21:00:00Z"
 }
