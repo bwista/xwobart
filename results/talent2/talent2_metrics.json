@@ -171,6 +171,446 @@
       ]
     },
     "r_pa100": 0.48849470890373836,
-    "r_pa30": 0.46633143616505746
+    "r_pa30": 0.46633143616505707
+  },
+  "l2b": {
+    "hypers": {
+      "dims": [
+        "xwoba",
+        "avg_ev",
+        "barrel_rate"
+      ],
+      "seasons": [
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "mu": [
+        [
+          0.3034462311705643,
+          87.90519771680488,
+          0.07059636004862406
+        ],
+        [
+          0.3125624875549739,
+          88.30615461343756,
+          0.07606165652272198
+        ],
+        [
+          0.30942532095221686,
+          88.12272489780231,
+          0.07400308397631221
+        ],
+        [
+          0.3166348040093643,
+          88.54551165395291,
+          0.0797704205934197
+        ]
+      ],
+      "Sigma": [
+        [
+          0.0009744028016510834,
+          0.05852891958577584,
+          0.0008160273819524341
+        ],
+        [
+          0.05852891958577584,
+          5.833347800097552,
+          0.07308089740640546
+        ],
+        [
+          0.0008160273819524341,
+          0.07308089740640546,
+          0.0013494464742828517
+        ]
+      ],
+      "center": [
+        0.3107876571467453,
+        88.13984903917957,
+        0.07855086873480627
+      ],
+      "scale": [
+        0.03822454308179925,
+        2.8114003338631957,
+        0.04245753467166425
+      ],
+      "n_fit": 1830,
+      "n_fallback_1d": 93,
+      "zero_offdiag": false,
+      "fit_seasons": null
+    },
+    "sigma_talent_corr": [
+      [
+        1.0,
+        0.7763227438335072,
+        0.7116355550217476
+      ],
+      [
+        0.7763227438335072,
+        1.0,
+        0.8236962801479044
+      ],
+      [
+        0.7116355550217476,
+        0.8236962801479044,
+        1.0
+      ]
+    ],
+    "pooled_pa100": {
+      "n": 1060,
+      "xwoba_talent2": {
+        "r": 0.49078312334037194,
+        "rmse_calibrated": 0.034463003692240694
+      },
+      "xwoba_talent": {
+        "r": 0.4885949663907888,
+        "rmse_calibrated": 0.03451161401984015
+      },
+      "xwoba_raw": {
+        "r": 0.48350704557307783,
+        "rmse_calibrated": 0.03462354291826486
+      },
+      "xwoba_savant": {
+        "r": 0.4907537432743178,
+        "rmse_calibrated": 0.034463658269833074
+      }
+    },
+    "pooled_pa30": {
+      "n": 1173,
+      "xwoba_talent2": {
+        "r": 0.46981715457462436,
+        "rmse_calibrated": 0.035216374228278946
+      },
+      "xwoba_talent": {
+        "r": 0.4668922111971058,
+        "rmse_calibrated": 0.0352782280813095
+      },
+      "xwoba_raw": {
+        "r": 0.44540823192831885,
+        "rmse_calibrated": 0.03571758771516965
+      },
+      "xwoba_savant": {
+        "r": 0.4521325806273592,
+        "rmse_calibrated": 0.0355828738217713
+      }
+    },
+    "by_band": [
+      {
+        "band": "[30,60)",
+        "median_reliability2": 0.40186061608922086,
+        "mean_abs_l2_minus_p1": 0.010210946521556612,
+        "n": 50,
+        "xwoba_talent2": {
+          "r": 0.3106893589801307,
+          "rmse_calibrated": 0.04412988563096418
+        },
+        "xwoba_talent": {
+          "r": 0.23892878394381517,
+          "rmse_calibrated": 0.04508283762114912
+        },
+        "xwoba_raw": {
+          "r": 0.20876814688577536,
+          "rmse_calibrated": 0.045404490697488614
+        },
+        "xwoba_savant": {
+          "r": 0.21113865062163897,
+          "rmse_calibrated": 0.04538085716530282
+        }
+      },
+      {
+        "band": "[60,100)",
+        "median_reliability2": 0.5043775396207524,
+        "mean_abs_l2_minus_p1": 0.008990241737057423,
+        "n": 63,
+        "xwoba_talent2": {
+          "r": 0.12468121294560251,
+          "rmse_calibrated": 0.037743620996731723
+        },
+        "xwoba_talent": {
+          "r": 0.0882050651914141,
+          "rmse_calibrated": 0.0378921874026859
+        },
+        "xwoba_raw": {
+          "r": 0.1102350470007558,
+          "rmse_calibrated": 0.03780862045822361
+        },
+        "xwoba_savant": {
+          "r": 0.12826281613295282,
+          "rmse_calibrated": 0.03772625020050038
+        }
+      },
+      {
+        "band": "[100,250)",
+        "median_reliability2": 0.6547221315292164,
+        "mean_abs_l2_minus_p1": 0.0069095674862641775,
+        "n": 227,
+        "xwoba_talent2": {
+          "r": 0.29346730864032705,
+          "rmse_calibrated": 0.03522271139427216
+        },
+        "xwoba_talent": {
+          "r": 0.2768657371046179,
+          "rmse_calibrated": 0.03540470756559789
+        },
+        "xwoba_raw": {
+          "r": 0.2783185467552193,
+          "rmse_calibrated": 0.03538924051176653
+        },
+        "xwoba_savant": {
+          "r": 0.29307531656321445,
+          "rmse_calibrated": 0.035227141913493305
+        }
+      },
+      {
+        "band": "[250,inf)",
+        "median_reliability2": 0.8005594359554897,
+        "mean_abs_l2_minus_p1": 0.003957282346128828,
+        "n": 833,
+        "xwoba_talent2": {
+          "r": 0.5121974955397283,
+          "rmse_calibrated": 0.034107223330754964
+        },
+        "xwoba_talent": {
+          "r": 0.512243000257921,
+          "rmse_calibrated": 0.03410614559111323
+        },
+        "xwoba_raw": {
+          "r": 0.516417144776712,
+          "rmse_calibrated": 0.03400673094684571
+        },
+        "xwoba_savant": {
+          "r": 0.5230171796022733,
+          "rmse_calibrated": 0.033847287049572905
+        }
+      }
+    ],
+    "split": {
+      "note": "G6: model choices are scored on select (T=2022,2023); confirm (T=2024) is reported, never tuned on.",
+      "select": {
+        "n": 787,
+        "xwoba_talent2": {
+          "r": 0.461501080779542,
+          "rmse_calibrated": 0.035985054213312336
+        },
+        "xwoba_talent": {
+          "r": 0.4552487745222713,
+          "rmse_calibrated": 0.036115855102655005
+        },
+        "xwoba_raw": {
+          "r": 0.43246068089219025,
+          "rmse_calibrated": 0.03657375112459517
+        },
+        "xwoba_savant": {
+          "r": 0.44047857771886706,
+          "rmse_calibrated": 0.03641597433875803
+        }
+      },
+      "confirm": {
+        "n": 386,
+        "xwoba_talent2": {
+          "r": 0.4909012955799014,
+          "rmse_calibrated": 0.033513282266933446
+        },
+        "xwoba_talent": {
+          "r": 0.49429743256922,
+          "rmse_calibrated": 0.033439334590684044
+        },
+        "xwoba_raw": {
+          "r": 0.47608068567430406,
+          "rmse_calibrated": 0.033828191133197426
+        },
+        "xwoba_savant": {
+          "r": 0.4783200489949503,
+          "rmse_calibrated": 0.03378141439137393
+        }
+      }
+    },
+    "gates": [
+      {
+        "name": "G3.lowpa",
+        "pass": true,
+        "detail": "PA>=30 n=1173: r 0.4698 vs 0.4669 (d=+0.0029), rmse_cal 0.035216 vs 0.035278 (d=-0.000062)"
+      },
+      {
+        "name": "G4.highpa",
+        "pass": true,
+        "detail": "PA>=100 n=1060: r 0.4908 vs 0.4886 (d=+0.0022)"
+      }
+    ],
+    "paired_bootstrap_pa30": {
+      "n_reps": 5000,
+      "n_rows": 1173,
+      "compare": "xwoba_talent2 - xwoba_talent",
+      "delta_r": {
+        "mean": 0.002852911693902516,
+        "ci95": [
+          -0.011671240941901175,
+          0.017626744433220546
+        ],
+        "frac_better": 0.6408
+      },
+      "delta_rmse_calibrated": {
+        "mean": -6.043195842928493e-05,
+        "ci95": [
+          -0.00038268350040697934,
+          0.000243112891194893
+        ],
+        "frac_better": 0.6408
+      }
+    },
+    "ablations": {
+      "note": "Scored on select (T=2022,2023) PA>=30 pooled. confirm reported for context; the shipped table stays the full 3-D fit.",
+      "xwoba+avg_ev": {
+        "select": {
+          "n": 787,
+          "xwoba_talent2": {
+            "r": 0.45727685316395966,
+            "rmse_calibrated": 0.03607367418756031
+          },
+          "xwoba_talent": {
+            "r": 0.4552487745222713,
+            "rmse_calibrated": 0.036115855102655005
+          }
+        },
+        "confirm": {
+          "n": 386,
+          "xwoba_talent2": {
+            "r": 0.49932189750243405,
+            "rmse_calibrated": 0.03332869148460935
+          },
+          "xwoba_talent": {
+            "r": 0.49429743256922,
+            "rmse_calibrated": 0.033439334590684044
+          }
+        },
+        "n_fallback_1d": 93
+      },
+      "xwoba+barrel_rate": {
+        "select": {
+          "n": 787,
+          "xwoba_talent2": {
+            "r": 0.458775433241802,
+            "rmse_calibrated": 0.036042353681850624
+          },
+          "xwoba_talent": {
+            "r": 0.4552487745222713,
+            "rmse_calibrated": 0.036115855102655005
+          }
+        },
+        "confirm": {
+          "n": 386,
+          "xwoba_talent2": {
+            "r": 0.4878054467916449,
+            "rmse_calibrated": 0.03358010675427628
+          },
+          "xwoba_talent": {
+            "r": 0.49429743256922,
+            "rmse_calibrated": 0.033439334590684044
+          }
+        },
+        "n_fallback_1d": 93
+      },
+      "full_3d": {
+        "select": {
+          "n": 787,
+          "xwoba_talent2": {
+            "r": 0.461501080779542,
+            "rmse_calibrated": 0.035985054213312336
+          },
+          "xwoba_talent": {
+            "r": 0.4552487745222713,
+            "rmse_calibrated": 0.036115855102655005
+          }
+        },
+        "confirm": {
+          "n": 386,
+          "xwoba_talent2": {
+            "r": 0.4909012955799014,
+            "rmse_calibrated": 0.033513282266933446
+          },
+          "xwoba_talent": {
+            "r": 0.49429743256922,
+            "rmse_calibrated": 0.033439334590684044
+          }
+        },
+        "n_fallback_1d": 93
+      }
+    },
+    "offdiag_tripwire": {
+      "note": "G5: zeroing S_i's off-diagonals discards the shared sampling noise between xwOBA, EV and barrel rate. A LARGER apparent gain without them means the gain is that noise being fitted.",
+      "gain_proper": 0.002924943377518585,
+      "gain_zeroed": -0.010103080286221866,
+      "artifact_gap": -0.013028023663740451,
+      "threshold": 0.005,
+      "offdiag_alarm": false,
+      "race_zeroed": {
+        "n": 1173,
+        "xwoba_talent2": {
+          "r": 0.4567891309108839,
+          "rmse_calibrated": 0.035488097724882234
+        },
+        "xwoba_talent": {
+          "r": 0.4668922111971058,
+          "rmse_calibrated": 0.0352782280813095
+        }
+      }
+    },
+    "hypers_2224_sensitivity": {
+      "note": "Hyperparameters refit excluding 2025 measurement rows (posteriors still computed for all rows; 2025 talent is never a predictor, only a target). Phase-1 convention fits all seasons; this quantifies how much that convention matters.",
+      "race": {
+        "n": 1173,
+        "xwoba_talent2": {
+          "r": 0.4693657188562683,
+          "rmse_calibrated": 0.03522595306309015
+        },
+        "xwoba_talent": {
+          "r": 0.4668922111971058,
+          "rmse_calibrated": 0.0352782280813095
+        },
+        "xwoba_raw": {
+          "r": 0.44540823192831885,
+          "rmse_calibrated": 0.03571758771516965
+        },
+        "xwoba_savant": {
+          "r": 0.4521325806273592,
+          "rmse_calibrated": 0.0355828738217713
+        }
+      },
+      "delta_r_vs_allseason": -0.00045143571835604135,
+      "n_fit": 1371
+    },
+    "interval_width_by_pa": [
+      {
+        "band": "[30,60)",
+        "n": 239,
+        "phase1": 0.08685236827271561,
+        "level2": 0.07879428754106876
+      },
+      {
+        "band": "[60,100)",
+        "n": 243,
+        "phase1": 0.07872190300268414,
+        "level2": 0.071990841642944
+      },
+      {
+        "band": "[100,250)",
+        "n": 567,
+        "phase1": 0.06668874343088993,
+        "level2": 0.060428518041740625
+      },
+      {
+        "band": "[250,450)",
+        "n": 609,
+        "phase1": 0.0536306652668358,
+        "level2": 0.049794055361719325
+      },
+      {
+        "band": "[450,inf)",
+        "n": 654,
+        "phase1": 0.04656537560273283,
+        "level2": 0.04371113774826607
+      }
+    ]
   }
 }
