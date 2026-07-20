@@ -2,18 +2,18 @@
 
 <!-- stage_A -->
 ## Stage A
-- kit_sha: 648b990 | seed: 42 | fit rows: 5000 | predict rows: {'train': 20000, 'holdout': 20000, 'capped': True}
+- kit_sha: fcbb78a | seed: 42 | fit rows: 5000 | predict rows: {'train': 20000, 'holdout': 20000, 'capped': True}
 - coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
 - fit runtime: 0.4 min | total: 0.6 min
 - linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
 - volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
 - sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
-- replication r — event train 0.845, event holdout 0.840, player train 0.453, player holdout 0.455
-- calibration — weighted ECE 0.0801
-- ELPD (lppd) -14401.3 ± 100.6 over 20000 events
-- undercorrection corr — model 0.028 vs public -0.002
-- localization slopes (per ft/s) — grounder 0.0010, barrel -0.0039
-- sanity warnings: ['max R-hat on probed mu cells = 1.828 (> 1.1)']
+- replication r — event train 0.895, event holdout 0.893, player train 0.471, player holdout 0.506
+- calibration — weighted ECE 0.0581
+- ELPD (lppd) -13818.7 ± 99.2 over 20000 events
+- undercorrection corr — model 0.034 vs public -0.002
+- localization slopes (per ft/s) — grounder -0.0002, barrel -0.0042
+- sanity warnings: ['max R-hat on probed mu cells = 1.806 (> 1.1)']
 <!-- /stage_A -->
 
 <!-- stage_B -->
@@ -217,3 +217,19 @@ the extra data only tightened R-hat (1.67 → 1.17).
   structurally high (the sum-of-trees is not identified at the cell level; 1.83 → 1.67 →
   1.17 as data grows) and is not a meaningful convergence signal — `verify_oos_mechanism`
   (corr ~1.0) gates real convergence. Approved at the Stage A review gate.
+
+<!-- stage_A_spray -->
+## Stage A_spray
+- kit_sha: fcbb78a | seed: 42 | fit rows: 5000 | predict rows: {'train': 20000, 'holdout': 20000, 'capped': True}
+- coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
+- fit runtime: 0.4 min | total: 0.8 min
+- linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
+- volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
+- sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
+- replication r — event train 0.819, event holdout 0.813, player train 0.459, player holdout 0.465
+- calibration — weighted ECE 0.0559
+- ELPD (lppd) -14561.7 ± 105.1 over 20000 events
+- undercorrection corr — model 0.027 vs public -0.002
+- localization slopes (per ft/s) — grounder 0.0019, barrel 0.0003
+- sanity warnings: ['max R-hat on probed mu cells = 1.316 (> 1.1)']
+<!-- /stage_A_spray -->

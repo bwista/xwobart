@@ -4,5 +4,8 @@ __pycache__/
 .env
 data/
 results/**/*.nc
+results/**/*.npy
+results/**/*.pkl
+results/**/ev_draws_keys_*.parquet
 .pytest_cache/
 .DS_Store
