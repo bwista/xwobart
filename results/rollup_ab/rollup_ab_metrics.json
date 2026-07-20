@@ -1,0 +1,255 @@
+{
+  "shapes": {
+    "n_events": 485601,
+    "draws": 200,
+    "train_events": 363595,
+    "holdout_events": 122006,
+    "player_seasons": 2668
+  },
+  "pooled_pa30": {
+    "n": 1172,
+    "xwoba_conditioned": {
+      "r": 0.3949855495764787,
+      "rmse_calibrated": 0.036587884297649295
+    },
+    "xwoba_marginalized": {
+      "r": 0.41300663110327357,
+      "rmse_calibrated": 0.036270894518604754
+    },
+    "xwoba_v0": {
+      "r": 0.4373682684138725,
+      "rmse_calibrated": 0.03581506192196005
+    },
+    "xwoba_savant": {
+      "r": 0.45054462996890454,
+      "rmse_calibrated": 0.03555505278429955
+    }
+  },
+  "pooled_pa100": {
+    "n": 1058,
+    "xwoba_conditioned": {
+      "r": 0.43902442006078557,
+      "rmse_calibrated": 0.03544410333699187
+    },
+    "xwoba_marginalized": {
+      "r": 0.4579480449616671,
+      "rmse_calibrated": 0.035069487200137514
+    },
+    "xwoba_v0": {
+      "r": 0.4807438049584238,
+      "rmse_calibrated": 0.03459144780113097
+    },
+    "xwoba_savant": {
+      "r": 0.4870755537397356,
+      "rmse_calibrated": 0.03445332574375354
+    }
+  },
+  "by_band": [
+    {
+      "band": "30-60",
+      "lo": 30,
+      "hi": 60,
+      "n": 51,
+      "xwoba_conditioned": {
+        "r": 0.2193406641749507,
+        "rmse_calibrated": 0.04519182458185758
+      },
+      "xwoba_marginalized": {
+        "r": 0.22497428323317167,
+        "rmse_calibrated": 0.04513236697099625
+      },
+      "xwoba_v0": {
+        "r": 0.25565680859101364,
+        "rmse_calibrated": 0.04478047091865551
+      },
+      "xwoba_savant": {
+        "r": 0.20708740965376682,
+        "rmse_calibrated": 0.04531568876616246
+      }
+    },
+    {
+      "band": "60-100",
+      "lo": 60,
+      "hi": 100,
+      "n": 63,
+      "xwoba_conditioned": {
+        "r": -0.034312305848864896,
+        "rmse_calibrated": 0.038370323410454016
+      },
+      "xwoba_marginalized": {
+        "r": -0.013829215460359062,
+        "rmse_calibrated": 0.038389259278440016
+      },
+      "xwoba_v0": {
+        "r": 0.03456852731098225,
+        "rmse_calibrated": 0.03836998441576808
+      },
+      "xwoba_savant": {
+        "r": 0.1820511829716632,
+        "rmse_calibrated": 0.037751348591913876
+      }
+    },
+    {
+      "band": "100-250",
+      "lo": 100,
+      "hi": 250,
+      "n": 227,
+      "xwoba_conditioned": {
+        "r": 0.2428797665851546,
+        "rmse_calibrated": 0.035802454226579364
+      },
+      "xwoba_marginalized": {
+        "r": 0.2597997919406668,
+        "rmse_calibrated": 0.035640286004075865
+      },
+      "xwoba_v0": {
+        "r": 0.2795015085830095,
+        "rmse_calibrated": 0.03543665757171301
+      },
+      "xwoba_savant": {
+        "r": 0.2801178677760653,
+        "rmse_calibrated": 0.0354300275320201
+      }
+    },
+    {
+      "band": "250+",
+      "lo": 250,
+      "hi": 10000000,
+      "n": 831,
+      "xwoba_conditioned": {
+        "r": 0.47236283473281326,
+        "rmse_calibrated": 0.03490067321584711
+      },
+      "xwoba_marginalized": {
+        "r": 0.49139989409434504,
+        "rmse_calibrated": 0.03448609093137488
+      },
+      "xwoba_v0": {
+        "r": 0.5170619528196603,
+        "rmse_calibrated": 0.03389269169116556
+      },
+      "xwoba_savant": {
+        "r": 0.5227544486885911,
+        "rmse_calibrated": 0.03375550228861837
+      }
+    }
+  ],
+  "by_pair": [
+    {
+      "pair": "2022->2023",
+      "n": 383,
+      "xwoba_conditioned": {
+        "r": 0.3710174807749684,
+        "rmse_calibrated": 0.037711864610090996
+      },
+      "xwoba_marginalized": {
+        "r": 0.39486318630688155,
+        "rmse_calibrated": 0.037310392294652
+      },
+      "xwoba_v0": {
+        "r": 0.43226783862869367,
+        "rmse_calibrated": 0.03662023194599097
+      },
+      "xwoba_savant": {
+        "r": 0.4696895602887477,
+        "rmse_calibrated": 0.03585214259706293
+      }
+    },
+    {
+      "pair": "2023->2024",
+      "n": 403,
+      "xwoba_conditioned": {
+        "r": 0.3905503021561193,
+        "rmse_calibrated": 0.036766635360934705
+      },
+      "xwoba_marginalized": {
+        "r": 0.40766350171825577,
+        "rmse_calibrated": 0.036469119246154015
+      },
+      "xwoba_v0": {
+        "r": 0.42256349607642046,
+        "rmse_calibrated": 0.036197581179660814
+      },
+      "xwoba_savant": {
+        "r": 0.4321411546515768,
+        "rmse_calibrated": 0.036016765896671764
+      }
+    },
+    {
+      "pair": "2024->2025",
+      "n": 386,
+      "xwoba_conditioned": {
+        "r": 0.44473259092034373,
+        "rmse_calibrated": 0.03445373818905983
+      },
+      "xwoba_marginalized": {
+        "r": 0.4577180294098814,
+        "rmse_calibrated": 0.03420116248698867
+      },
+      "xwoba_v0": {
+        "r": 0.47939746256327587,
+        "rmse_calibrated": 0.03375880752170607
+      },
+      "xwoba_savant": {
+        "r": 0.4783200489949503,
+        "rmse_calibrated": 0.03378141439137393
+      }
+    }
+  ],
+  "note_rmse_vs_r": "for a fixed target set, ranking by calibrated RMSE and by r is the same ranking (rmse = sd(target)*sqrt(1-r^2))",
+  "paired_bootstrap_pa30": {
+    "n_reps": 5000,
+    "n_rows": 1172,
+    "compare": "xwoba_conditioned - xwoba_marginalized",
+    "delta_r": {
+      "mean": -0.017957426737252258,
+      "ci95": [
+        -0.024503196067549013,
+        -0.011324562012831638
+      ],
+      "frac_better": 0.0
+    },
+    "delta_rmse_calibrated": {
+      "mean": 0.00031621754363495003,
+      "ci95": [
+        0.00018879501034408403,
+        0.00045832847722423786
+      ],
+      "frac_better": 0.0
+    }
+  },
+  "paired_bootstrap_pa100": {
+    "n_reps": 5000,
+    "n_rows": 1058,
+    "compare": "xwoba_conditioned - xwoba_marginalized",
+    "delta_r": {
+      "mean": -0.018927067713988936,
+      "ci95": [
+        -0.02616141685447947,
+        -0.011711076528157165
+      ],
+      "frac_better": 0.0
+    },
+    "delta_rmse_calibrated": {
+      "mean": 0.00037497269993471755,
+      "ci95": [
+        0.00022547266095707257,
+        0.0005352597238846127
+      ],
+      "frac_better": 0.0
+    }
+  },
+  "same_season_savant_corr_pa100": {
+    "n": 1829,
+    "xwoba_conditioned": 0.9012204766961934,
+    "xwoba_marginalized": 0.9205333425305291,
+    "xwoba_v0": 0.948174616995852
+  },
+  "verdict": {
+    "pa30_lower_rmse": "xwoba_marginalized",
+    "pa100_lower_rmse": "xwoba_marginalized",
+    "delta_rmse_pa30_cond_minus_marg": 0.00031698977904454084,
+    "resolvable": false,
+    "stage4_talent_input": "tie - under 0.001 calibrated RMSE at this n"
+  }
+}
