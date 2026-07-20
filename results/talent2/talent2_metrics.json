@@ -1,0 +1,176 @@
+{
+  "l2a": {
+    "gates": [
+      {
+        "name": "G1.height",
+        "pass": true,
+        "detail": "rows 2636 (phase1 2636), joined 2636"
+      },
+      {
+        "name": "G1.match",
+        "pass": true,
+        "detail": "corr 0.99950, median |diff| 0.00025 on 2500/2636 comparable rows"
+      },
+      {
+        "name": "G2.se",
+        "pass": true,
+        "detail": "corr 0.9965, median ratio 1.002"
+      },
+      {
+        "name": "G1.val100",
+        "pass": true,
+        "detail": "r 0.4885 vs anchor 0.4886"
+      },
+      {
+        "name": "G1.val30",
+        "pass": true,
+        "detail": "r 0.4663 vs anchor 0.4669"
+      }
+    ],
+    "hypers": {
+      "dims": [
+        "xwoba"
+      ],
+      "seasons": [
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "mu": [
+        [
+          0.3046441041988198
+        ],
+        [
+          0.3142504635001689
+        ],
+        [
+          0.31039504850940036
+        ],
+        [
+          0.31803571593620517
+        ]
+      ],
+      "Sigma": [
+        [
+          0.0009613958632615849
+        ]
+      ],
+      "center": [
+        0.3107876571467454
+      ],
+      "scale": [
+        0.038224543081799255
+      ],
+      "n_fit": 1830,
+      "n_fallback_1d": 0,
+      "zero_offdiag": false,
+      "fit_seasons": null
+    },
+    "floor_fix": {
+      "note": "Rows where the Level-2 measurement-variance floor binds: Phase 1's analytic se2 collapsed below FLOOR_SD_PER_PA^2/n (degenerate tiny samples), so Phase 1 reported near-zero uncertainty and barely shrank them. Excluded from G1.match by design; this is the intended fix of results/talent/NOTES.md limitation 3.",
+      "n_floor_bound": 136,
+      "n_comparable": 2500,
+      "corr_all_rows": 0.7619742598110791,
+      "corr_comparable": 0.9995000063711523,
+      "median_pa_floor_bound": 11.5,
+      "max_abs_diff_floor_bound": 0.30854347837629137,
+      "median_abs_diff_floor_bound": 0.010204417728527967,
+      "n_phase1_se2_exactly_zero": 7,
+      "biggest_moves": [
+        {
+          "player_name": "Trevor Rogers",
+          "season": 2025,
+          "PA": 2,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.30854347837629137,
+          "moved": 0.30854347837629137
+        },
+        {
+          "player_name": "Greg Jones",
+          "season": 2025,
+          "PA": 2,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.30854347837629137,
+          "moved": 0.30854347837629137
+        },
+        {
+          "player_name": "Chris Okey",
+          "season": 2023,
+          "PA": 2,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.304871202293371,
+          "moved": 0.304871202293371
+        },
+        {
+          "player_name": "Drew Romo",
+          "season": 2025,
+          "PA": 3,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.3040067175067008,
+          "moved": 0.3040067175067008
+        },
+        {
+          "player_name": "Tyler Naquin",
+          "season": 2023,
+          "PA": 3,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.3003884378281867,
+          "moved": 0.3003884378281867
+        },
+        {
+          "player_name": "Billy Hamilton",
+          "season": 2023,
+          "PA": 2,
+          "xwoba_raw": 0.004,
+          "phase1": 0.009154212174697474,
+          "level2": 0.30499058809923213,
+          "moved": 0.29583637592453466
+        },
+        {
+          "player_name": "C\u00e9sar Prieto",
+          "season": 2025,
+          "PA": 5,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.2953220074340305,
+          "moved": 0.2953220074340305
+        },
+        {
+          "player_name": "Brewer Hicklen",
+          "season": 2022,
+          "PA": 4,
+          "xwoba_raw": 0.0,
+          "phase1": 0.0,
+          "level2": 0.28698604370404374,
+          "moved": 0.28698604370404374
+        },
+        {
+          "player_name": "Terrance Gore",
+          "season": 2022,
+          "PA": 3,
+          "xwoba_raw": 0.004666666666666667,
+          "phase1": 0.011229074605332179,
+          "level2": 0.2914116815835262,
+          "moved": 0.280182606978194
+        },
+        {
+          "player_name": "Tony Wolters",
+          "season": 2022,
+          "PA": 4,
+          "xwoba_raw": 0.005,
+          "phase1": 0.012500719367406543,
+          "level2": 0.2872758582819627,
+          "moved": 0.2747751389145562
+        }
+      ]
+    },
+    "r_pa100": 0.48849470890373836,
+    "r_pa30": 0.46633143616505746
+  }
+}
