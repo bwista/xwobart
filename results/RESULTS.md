@@ -313,19 +313,83 @@ modal-hand (rather than per-event) mirror, reports **+8.68 L / +5.60 R** on the 
 switch-hitter batter-seasons — the correct-mirror row, and far from the simulated bug's
 −3.97.
 
-## Phase 2 Stage 3 — spray surface (NOT YET RUN)
+## Phase 2 Stage 3 — spray surface: **E1 FAILS. Spray does not improve the surface.**
 
-The 5-feature refit has **not** been executed; `results/stage_C_spray/` holds no metrics.
-All of its machinery is built, committed and smoke-tested end to end at Stage A
-(`results/stage_A_spray/`), and the two commands are:
+`results/stage_C_spray/` · 5 features `[launch_speed, launch_angle, spray_pull, stand_R,
+sprint_speed]` · same orchestrator, same 100,000-row seed-42 subsample, same 122,006-event
+holdout as v0 Stage C · fit 26.2 min, total 30.0 min.
 
-```bash
-.venv/bin/python scripts/run_v0.py --stage C --variant spray --acknowledge-runtime  # ~30 min
-.venv/bin/python scripts/marginalize_spray.py -M 9                                  # ~30 min
-.venv/bin/python scripts/rollup_ab.py                                               # seconds
-```
+### The verdict
 
-Gates E1–E8 are unscored until then.
+| | holdout ELPD (122,006 events) |
+|---|---|
+| frozen v0 anchor (3-feature) | −80,107.5 |
+| v0 replicate (3-feature, same session) | −79,840.4 |
+| **spray (5-feature)** | **−79,876.3** |
+
+- **spray − anchor = +231.2 nats.** E1 required **≥ +1000**. → **FAIL.**
+- **spray − v0 replicate = −35.9 nats.** Against a same-session 3-feature control the
+  spray surface is, if anything, *slightly worse*.
+- The apparent +231 "gain" is **inside the measured +267.1-nat run-to-run noise floor** —
+  it is fully explained by the frozen anchor being an unlucky draw, not by spray.
+
+Without the replicate this would have read as a real-but-sub-threshold improvement. It is
+not an improvement at all. **That is the whole reason the noise floor was measured first.**
+
+### The implementation is correct — this is a genuine negative, not a bug
+
+The plan's 5-item E1-failure checklist comes back clean on every item:
+
+1. `spray_pull` is in `X_fit` — and pymc-bart's own variable importance ranks it **#3 of 5**
+   (`indices [1, 0, 2, 3, 4]`: launch_angle > launch_speed > **spray_pull** > stand_R >
+   sprint_speed).
+2. Sign QC ran against the rebuilt caches: mean `spray_pull` on the fit frame is **+7.13
+   (LHB) / +3.47 (RHB)** — both positive, matching the S1 anchors.
+3. `stand_R` is not constant: values {0.0, 1.0}, mean **0.5935** (the league RHB share).
+4. Holdout event count is exactly **122,006**.
+5. Subsample is **100,000 rows at seed 42**; predict rows 363,595 / 122,006; hc imputation
+   0.039% train / 0.036% holdout.
+
+And the model plainly *learned* spray: `figures/pdp_la_spray_hr.png` shows the HR band at
+LA 25–35° leaning strongly to the pulled side, P(HR) rising **0.20 → 0.37** from −40° (oppo)
+to +40° (pull) at fixed EV 103. The feature is real, correctly signed, and used. It simply
+does not buy out-of-sample likelihood.
+
+### Other gates
+
+| gate | result | detail |
+|---|---|---|
+| **E1** ELPD ≥ anchor + 1000 | **FAIL** | +231.2 nats, inside the 267-nat null noise |
+| **E2** ECE ≤ 0.046456 | **FAIL** | **0.053134** vs v0 0.042233 / replicate 0.040203 |
+| E3 triple Brier ≤ 0.005013 | PASS (diagnostic) | 0.005007; double improves (0.050683 vs 0.052073), HR worsens (0.027107 vs 0.025344) |
+| E4 `verify_oos_mechanism` | PASS | corr 0.9969, mean abs diff 0.0106 |
+| E5 no collapsed classes | PASS | only the structural mu R-hat warning (1.188) |
+| E6 draws persisted | PASS | (200, 363,595) + (200, 122,006) float32, row-aligned |
+| E7 importance / PDP | mixed (diagnostic) | spray_pull top-3 ✓, HR-band PDP leans pulled ✓, but sprint migration is **backwards**: pulled-grounder slope 0.000716 < oppo 0.000883 (`pull_minus_oppo` −0.000167) |
+
+E2 is the second hard failure and it sharpens the story: the 5-feature surface did not
+trade calibration for likelihood — **it lost on both**. Event replication also falls
+(r 0.8734 vs 0.9105 anchor / 0.9185 replicate) and player replication with it (0.9075 vs
+0.9560). The plan anticipated a small replication drop *alongside an ELPD gain*; with no
+gain, this is just degradation.
+
+### What this means, and what was deliberately not done
+
+Per the plan, no hyperparameter was touched after the failure — raising `m_trees`, `draws`
+or the subsample would break the protocol parity that makes the anchor comparison valid at
+all. A documented non-beat is a valid outcome of this plan; a rescued one is not.
+
+The most likely reading is **capacity dilution, not missing information**: with `m_trees`
+fixed at 50 and the same 100,000 training rows, two extra dimensions spread the same tree
+budget over a larger feature space, and the splits spent resolving spray are splits no
+longer spent resolving EV × LA. The in-sample PDP shows the signal is there; the held-out
+likelihood shows it does not pay for what it costs. That yields a clean, testable follow-up
+for a future stage — **match capacity (raise `m_trees`) and re-run both variants under the
+new setting**, comparing spray-vs-v0 at equal capacity rather than against a frozen
+3-feature anchor. That is a new experiment with its own anchor, not a rescue of this one.
+
+Design risk 2 (spray conditioning credits spray *luck*) is now moot for rollup selection:
+with the surface not beating v0, there is no spray-conditioned rollup worth promoting.
 
 <!-- stage_A_spray -->
 ## Stage A_spray
@@ -342,3 +406,19 @@ Gates E1–E8 are unscored until then.
 - localization slopes (per ft/s) — grounder 0.0019, barrel 0.0003
 - sanity warnings: ['max R-hat on probed mu cells = 1.316 (> 1.1)']
 <!-- /stage_A_spray -->
+
+<!-- stage_C_spray -->
+## Stage C_spray
+- kit_sha: fcbb78a | seed: 42 | fit rows: 100000 | predict rows: {'train': 363595, 'holdout': 122006, 'capped': False}
+- coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
+- fit runtime: 26.2 min | total: 30.0 min
+- linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
+- volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
+- sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
+- replication r — event train 0.874, event holdout 0.873, player train 0.909, player holdout 0.908
+- calibration — weighted ECE 0.0531
+- ELPD (lppd) -79876.3 ± 238.2 over 122006 events
+- undercorrection corr — model 0.042 vs public 0.013
+- localization slopes (per ft/s) — grounder 0.0007, barrel -0.0023
+- sanity warnings: ['max R-hat on probed mu cells = 1.188 (> 1.1)']
+<!-- /stage_C_spray -->
