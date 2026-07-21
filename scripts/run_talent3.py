@@ -11,8 +11,10 @@ can post-date its cutpoint; full-season measurements bootstrapped ONCE and reuse
 for the LOSO fit and the priors; a single shared RNG for reproducibility, with all
 iteration explicitly sorted (polars group_by / partition_by do not guarantee order).
 
-Writes results/talent3/forecast_table.parquet + leakage_digest.json. Scoring/gates
-are Task 10; NOTES/figures are Task 11. Run from repo root:
+main() runs the full pipeline in one invocation: the sweep (Task 9), scoring
+against the five benchmarks plus the five gates (Task 10), and the four figures
+(Task 11). Writes results/talent3/forecast_table.parquet, metrics.json,
+leakage_digest.json and figures/*.png. Run from repo root:
 `.venv/bin/python scripts/run_talent3.py`."""
 from __future__ import annotations
 
@@ -52,6 +54,8 @@ MIN_REMAINING = 30                     # need a real rest-of-season (D_rest >= t
 B_BOOT = 500                           # bootstrap reps for a measurement's variance
 B_FWD = 600                            # forward-bootstrap reps for the predictive range
 FIT_MIN_PA = 100                       # min full-season denom to enter a hyper/tau fit
+# intentionally mirrors cfg.min_pa (config evaluate.min_pa): the fit floor matching
+# Phase-1/Level-2.
 
 # ---------------------------------------------------------------------------
 # Task 10: gate scoring + metrics
@@ -401,9 +405,6 @@ def run_scoring(cfg) -> dict:
     tbl = pl.read_parquet(outdir / "forecast_table.parquet")
     sf = make_score_frame(tbl)
 
-    K_ORDER = [str(k) for k in CUTPOINTS]
-    W_ORDER = [f"{W_EDGES[i]:.1f}-{W_EDGES[i + 1]:.1f}" for i in range(len(W_EDGES) - 1)]
-
     print("\nscoring vs benchmarks...")
 
     # ---- RMSE: pooled (plain + calibrated), by k-band, by w-band ----------
@@ -477,6 +478,9 @@ def run_scoring(cfg) -> dict:
     n_pass = sum(g["pass"] for g in gates)
     print(f"\n  gate summary: {n_pass}/5 PASS")
     failed = [g["name"] for g in gates if not g["pass"]]
+    # Intentional, unlike run_talent2.py's main() (which raises SystemExit(1) on a
+    # hard-gate failure): all five gates are reported here, none enforced -- G4
+    # currently FAILs and that is an accepted, documented finding.
     if failed:
         print(f"  gates NOT passing (reported as-is, not tuned to rescue): {failed}")
     print(f"  wrote {outdir}/metrics.json")
@@ -541,8 +545,9 @@ def fig_calibration_by_band(figdir: Path, metrics: dict) -> None:
         (ax2, "w-band (share of season remaining)", metrics["coverage_by_w"], W_ORDER),
     ]
     for ax, axis_name, table, order in panels:
-        shades = plt.get_cmap("Blues")(np.linspace(0.40, 0.95, len(order)))
-        for band, color in zip(order, shades):
+        bands = [b for b in order if all(b in table[str(lv)] for lv in levels)]
+        shades = plt.get_cmap("Blues")(np.linspace(0.40, 0.95, len(bands)))
+        for band, color in zip(bands, shades):
             ys = [table[str(lv)][band] for lv in levels]
             ax.plot(levels, ys, "o-", color=color, lw=1.8, ms=5.5, label=band)
         ax.plot([0.4, 1.0], [0.4, 1.0], "--", color=C_REF, lw=1.3, label="perfect calibration")
@@ -574,23 +579,25 @@ def fig_width_vs_pa_and_w(figdir: Path, sf: pl.DataFrame) -> None:
     the sharpness half of the calibration story."""
     by_k = _mean_widths_by(sf, "k", CUTPOINTS)
     by_w = _mean_widths_by(sf, "w_band", W_ORDER)
+    ks = [k for k in CUTPOINTS if k in by_k]
+    wbands = [b for b in W_ORDER if b in by_w]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    ax1.plot(CUTPOINTS, [by_k[k]["w80"] for k in CUTPOINTS], "o-", color=C_MODEL,
+    ax1.plot(ks, [by_k[k]["w80"] for k in ks], "o-", color=C_MODEL,
              lw=2.2, ms=6, label="80% width (q90−q10)")
-    ax1.plot(CUTPOINTS, [by_k[k]["w90"] for k in CUTPOINTS], "s--", color=C_MODEL,
+    ax1.plot(ks, [by_k[k]["w90"] for k in ks], "s--", color=C_MODEL,
              lw=1.6, ms=5.5, alpha=0.55, label="90% width (q95−q05)")
-    ax1.set_xticks(CUTPOINTS)
+    ax1.set_xticks(ks)
     ax1.set_xlabel("PA seen (k)"); ax1.set_ylabel("mean interval width (xwOBA)")
     ax1.set_title("Width narrows as more of the season is seen")
     ax1.legend(frameon=False, fontsize=8.5); ax1.grid(True, color=C_REF, alpha=0.15)
 
-    x = np.arange(len(W_ORDER))
-    ax2.plot(x, [by_w[b]["w80"] for b in W_ORDER], "o-", color=C_MODEL,
+    x = np.arange(len(wbands))
+    ax2.plot(x, [by_w[b]["w80"] for b in wbands], "o-", color=C_MODEL,
              lw=2.2, ms=6, label="80% width (q90−q10)")
-    ax2.plot(x, [by_w[b]["w90"] for b in W_ORDER], "s--", color=C_MODEL,
+    ax2.plot(x, [by_w[b]["w90"] for b in wbands], "s--", color=C_MODEL,
              lw=1.6, ms=5.5, alpha=0.55, label="90% width (q95−q05)")
-    ax2.set_xticks(x); ax2.set_xticklabels(W_ORDER)
+    ax2.set_xticks(x); ax2.set_xticklabels(wbands)
     ax2.set_xlabel("w-band (share of season remaining)"); ax2.set_ylabel("mean interval width (xwOBA)")
     ax2.set_title("Width narrows as runway shrinks")
     ax2.legend(frameon=False, fontsize=8.5); ax2.grid(True, color=C_REF, alpha=0.15)
@@ -621,11 +628,12 @@ def fig_rmse_vs_benchmarks(figdir: Path, metrics: dict) -> None:
     ax1.set_title(f"Pooled RMSE (n={metrics['leakage']['n_forecasts']:,} forecasts)")
     ax1.grid(True, axis="y", color=C_REF, alpha=0.15)
 
-    ks = [int(k) for k in K_ORDER]
-    ax2.plot(ks, [metrics["rmse_by_k"][k]["model"] for k in K_ORDER],
+    kbands = [k for k in K_ORDER if k in metrics["rmse_by_k"]]
+    ks = [int(k) for k in kbands]
+    ax2.plot(ks, [metrics["rmse_by_k"][k]["model"] for k in kbands],
              "o-", color=C_MODEL, lw=2.6, ms=6.5, label="model", zorder=5)
     for (key, label, marker, ls), color in zip(BENCH_SERIES, shades):
-        ys = [metrics["rmse_by_k"][k][key] for k in K_ORDER]
+        ys = [metrics["rmse_by_k"][k][key] for k in kbands]
         ax2.plot(ks, ys, marker + ls, color=color, lw=1.6, ms=5, label=label)
     ax2.set_xticks(ks)
     ax2.set_xlabel("PA seen (k)"); ax2.set_ylabel("RMSE of final-line forecast (xwOBA)")
@@ -691,10 +699,16 @@ def main():
     names = pl.read_parquet(cfg.results_dir / "talent" / "talent_table.parquet").select(
         "batter", "season", "player_name").unique()
     sf = make_score_frame(tbl)
-    fig_fan_chart(figdir, tbl, names)
+    # Data-driven figures first, hand-picked fan chart last (see below) so a stale
+    # FAN_EXAMPLES entry can never prevent these three from being written.
     fig_calibration_by_band(figdir, metrics)
     fig_width_vs_pa_and_w(figdir, sf)
     fig_rmse_vs_benchmarks(figdir, metrics)
+    try:
+        fig_fan_chart(figdir, tbl, names)
+    except Exception as exc:
+        print(f"  WARNING: fig_fan_chart skipped ({exc}) -- a hand-picked FAN_EXAMPLES "
+              f"entry is likely stale; the other three figures above are unaffected")
     print(f"  wrote {figdir}/*.png")
 
 
