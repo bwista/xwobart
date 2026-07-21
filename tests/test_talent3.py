@@ -77,3 +77,23 @@ def test_season_mu_causal_uses_only_first_k():
     mu_full = season_mu_causal(f, season=2024, k=10_000)
     all_v = f["value"].to_numpy(); all_d = f["denom"].to_numpy()
     assert abs(mu_full - all_v.sum() / all_d.sum()) < 1e-12
+
+
+from src.talent3 import fit_hypers_eb
+
+
+def test_fit_hypers_recovers_known_variances():
+    rng = np.random.default_rng(7)
+    sig_eta, sig_u = 0.030, 0.015
+    # 400 players, 3 seasons each, known measurement noise S≈0.02² per obs
+    ys, Ss, pid = [], [], []
+    for i in range(400):
+        eta = rng.normal(0, sig_eta)
+        for s in range(3):
+            u = rng.normal(0, sig_u)
+            S = 0.02 ** 2
+            ys.append(eta + u + rng.normal(0, np.sqrt(S)))
+            Ss.append(S); pid.append(i)
+    est_eta2, est_u2 = fit_hypers_eb(np.array(ys), np.array(Ss), np.array(pid))
+    assert abs(np.sqrt(est_eta2) - sig_eta) < 0.006   # within ~1 sampling SE
+    assert abs(np.sqrt(est_u2) - sig_u) < 0.006

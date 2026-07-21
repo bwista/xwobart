@@ -9,6 +9,7 @@ import numpy as np
 import polars as pl
 
 from src.talent2 import FLOOR_SD_PER_PA, bootstrap_S
+from scipy.optimize import minimize
 
 
 def build_pa_frame(pitches: pl.DataFrame) -> pl.DataFrame:
@@ -72,3 +73,28 @@ def season_mu_causal(pa_frame: pl.DataFrame, season: int, k: int) -> float:
         .filter(pl.col("_rank") <= k)
     )
     return float(s["value"].sum() / s["denom"].sum())
+
+
+def fit_hypers_eb(y: np.ndarray, S: np.ndarray, player_idx: np.ndarray
+                  ) -> tuple[float, float]:
+    """Marginal-MLE of (sigma_eta^2, sigma_u^2) for the rung-a hierarchy.
+    y = z - mu_s (demeaned measurements), S = per-obs measurement variance,
+    player_idx groups rows by player. Per player: y_i ~ N(0, sig_eta^2 11' +
+    diag(sig_u^2 + S_i)). Optimizes log-variances (positivity) with L-BFGS-B."""
+    groups = [np.where(player_idx == p)[0] for p in np.unique(player_idx)]
+
+    def nll(theta: np.ndarray) -> float:
+        se2, su2 = np.exp(theta)
+        total = 0.0
+        for g in groups:
+            yi, Si = y[g], S[g]
+            Sig = se2 * np.ones((len(g), len(g))) + np.diag(su2 + Si)
+            sign, logdet = np.linalg.slogdet(Sig)
+            sol = np.linalg.solve(Sig, yi)
+            total += 0.5 * (logdet + yi @ sol)
+        return float(total)
+
+    res = minimize(nll, np.log([0.02 ** 2, 0.01 ** 2]),
+                   method="L-BFGS-B", options={"maxiter": 200})
+    se2, su2 = np.exp(res.x)
+    return float(se2), float(su2)
