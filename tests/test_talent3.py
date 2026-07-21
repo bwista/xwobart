@@ -64,3 +64,16 @@ def test_sample_measurement_floor_binds_on_degenerate_sample():
     v = np.array([0.0, 0.0]); d = np.array([1.0, 1.0])   # zero variation
     _, s00 = sample_measurement(v, d, B=200, rng=rng)
     assert abs(s00 - FLOOR_SD_PER_PA ** 2 / 2) < 1e-12   # floored, not zero
+
+
+def test_season_mu_causal_uses_only_first_k():
+    from src.talent3 import season_mu_causal
+    # Two players, 2024. With k=1, only each player's earliest PA counts.
+    f = build_pa_frame(_pitches()).filter(pl.col("season") == 2024)
+    # player1 earliest (04-01) value .1 ; player2 earliest (04-01) value .8
+    mu_k1 = season_mu_causal(f, season=2024, k=1)
+    assert abs(mu_k1 - (0.1 + 0.8) / 2) < 1e-12
+    # full-season (k huge) = pooled league rate over all PAs
+    mu_full = season_mu_causal(f, season=2024, k=10_000)
+    all_v = f["value"].to_numpy(); all_d = f["denom"].to_numpy()
+    assert abs(mu_full - all_v.sum() / all_d.sum()) < 1e-12

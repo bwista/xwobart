@@ -60,3 +60,15 @@ def sample_measurement(value: np.ndarray, denom: np.ndarray, B: int,
     S = bootstrap_S(value, denom, nan, nan, B=B, rng=rng)
     z = float(value.sum() / denom.sum())
     return z, float(S[0, 0])
+
+
+def season_mu_causal(pa_frame: pl.DataFrame, season: int, k: int) -> float:
+    """League environment for `season`: pooled rate over every player's first-k PAs
+    (ordered by game_date). Causal — uses no PA beyond a cutpoint. k huge → full season."""
+    s = (
+        pa_frame.filter(pl.col("season") == season)
+        .sort("game_date", maintain_order=True)
+        .with_columns(_rank=pl.col("game_date").cum_count().over("batter"))
+        .filter(pl.col("_rank") <= k)
+    )
+    return float(s["value"].sum() / s["denom"].sum())
