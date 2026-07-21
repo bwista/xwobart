@@ -33,6 +33,7 @@ from src.talent import eb_fit
 from src.talent3 import (
     assert_causal,
     build_pa_frame,
+    coverage_by_band,
     cutpoint_posterior,
     cutpoint_split,
     fit_hypers_eb,
@@ -40,12 +41,20 @@ from src.talent3 import (
     season_mu_causal,
 )
 from run_talent import load_pitches
+from benchmark_vs_savant import _calibrated_rmse
 
 CUTPOINTS = [50, 100, 150, 200, 300]   # first-k PAs "observed" at the mid-season cut
 MIN_REMAINING = 30                     # need a real rest-of-season (D_rest >= this)
 B_BOOT = 500                           # bootstrap reps for a measurement's variance
 B_FWD = 600                            # forward-bootstrap reps for the predictive range
 FIT_MIN_PA = 100                       # min full-season denom to enter a hyper/tau fit
+
+# ---------------------------------------------------------------------------
+# Task 10: gate scoring + metrics
+# ---------------------------------------------------------------------------
+PREDS = ["model", "naive", "league", "marcel", "l2", "savant"]  # -> r_final_{name}
+BOOT_N = 2000                            # cluster-bootstrap reps for the paired deltas
+W_EDGES = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]  # w-band bin edges
 
 
 def precompute_full_measurements(groups: dict, rng: np.random.Generator) -> dict:
@@ -220,6 +229,220 @@ def run_sweep(groups: dict, full: dict, mu_full: dict, mu_k: dict, tau2: dict,
     return rows, n_cond, pair_counts
 
 
+def _gate(name: str, ok: bool, detail: str) -> dict:
+    print(f"  GATE {name}: {'PASS' if ok else 'FAIL'} — {detail}")
+    return {"name": name, "pass": bool(ok), "detail": detail}
+
+
+def _rmse(pred: np.ndarray, actual: np.ndarray) -> float:
+    return float(np.sqrt(np.mean((pred - actual) ** 2)))
+
+
+def pred_col(name: str) -> str:
+    return f"r_final_{name}"
+
+
+def w_band_labels(w: np.ndarray) -> np.ndarray:
+    """Bin w into half-open [lo,hi) bands on W_EDGES (last band closed at 1.0),
+    labelled like '0.2-0.4'."""
+    labels = [f"{W_EDGES[i]:.1f}-{W_EDGES[i + 1]:.1f}" for i in range(len(W_EDGES) - 1)]
+    idx = np.clip(np.digitize(w, W_EDGES[1:-1], right=False), 0, len(labels) - 1)
+    return np.array([labels[i] for i in idx])
+
+
+def make_score_frame(tbl: pl.DataFrame) -> pl.DataFrame:
+    """k_band/w_band columns + an 'actual' alias of r_final_actual, so this one
+    frame feeds both the by-band RMSE tables and coverage_by_band."""
+    return tbl.with_columns(
+        k_band=pl.col("k").cast(pl.Utf8),
+        w_band=pl.Series("w_band", w_band_labels(tbl["w"].to_numpy())),
+        actual=pl.col("r_final_actual"),
+    )
+
+
+def rmse_table(tbl: pl.DataFrame) -> dict:
+    """{pred_name: plain RMSE vs r_final_actual} for every PREDS column."""
+    a = tbl["r_final_actual"].to_numpy()
+    return {name: _rmse(tbl[pred_col(name)].to_numpy(), a) for name in PREDS}
+
+
+def rmse_by_band(tbl: pl.DataFrame, band_col: str, order: list[str]) -> dict:
+    by = {}
+    for band, sub in tbl.group_by(band_col):
+        b = band[0] if isinstance(band, tuple) else band
+        by[str(b)] = rmse_table(sub)
+    return {b: by[b] for b in order if b in by}
+
+
+def cluster_boot_delta(tbl_sub: pl.DataFrame, bench_col: str, model_col: str = "r_final_model",
+                       n_boot: int = BOOT_N, rng: np.random.Generator | None = None) -> dict:
+    """Cluster bootstrap over PLAYERS (respects within-player correlation across a
+    player's multiple cutpoint rows): resample len(unique batters) batters WITH
+    replacement, gather their rows WITH multiplicity, and compute
+    delta = rmse(bench) - rmse(model) on the pooled resample (positive => model
+    better). Point delta is on the full (unresampled) data; ci_lo/ci_hi are the
+    2.5/97.5 percentiles of the bootstrap distribution."""
+    if rng is None:
+        rng = np.random.default_rng(load_config().seed)
+    actual = tbl_sub["r_final_actual"].to_numpy()
+    bench = tbl_sub[bench_col].to_numpy()
+    model = tbl_sub[model_col].to_numpy()
+    batter_arr = tbl_sub["batter"].to_numpy()
+    unique_batters = np.unique(batter_arr)
+    idx_by_batter = {b: np.where(batter_arr == b)[0] for b in unique_batters}
+    n_players = len(unique_batters)
+
+    point = _rmse(bench, actual) - _rmse(model, actual)
+    deltas = np.empty(n_boot)
+    for r in range(n_boot):
+        sample = rng.choice(unique_batters, size=n_players, replace=True)
+        idx = np.concatenate([idx_by_batter[b] for b in sample])
+        deltas[r] = _rmse(bench[idx], actual[idx]) - _rmse(model[idx], actual[idx])
+    lo, hi = np.percentile(deltas, [2.5, 97.5])
+    return {"delta": float(point), "ci_lo": float(lo), "ci_hi": float(hi)}
+
+
+def _boot_label(d: dict) -> str:
+    if d["ci_lo"] > 0:
+        return "beat"
+    if d["ci_hi"] < 0:
+        return "worse"
+    return "tie"
+
+
+def check_calibration(coverage_by_k: dict, coverage_by_w: dict) -> tuple[float, list[str]]:
+    """Max |coverage-level| over every (level, band) cell in both tables, and the
+    list of cells exceeding the +-5pp tolerance."""
+    max_dev = 0.0
+    bad = []
+    for axis, table in (("k", coverage_by_k), ("w", coverage_by_w)):
+        for level_str, by_band in table.items():
+            level = float(level_str)
+            for band, cov in by_band.items():
+                dev = abs(cov - level)
+                max_dev = max(max_dev, dev)
+                if dev > 0.05:
+                    bad.append(f"{axis}_band={band} level={level_str}: "
+                              f"coverage={cov:.3f} (dev={dev:+.3f})")
+    return max_dev, bad
+
+
+def g5_check(cfg) -> dict:
+    """Phase-1 reduction check: feed each Phase-1 row's OWN inputs into talent3's
+    1-D posterior path (su2=0 strips the season-drift component so the prior
+    variance is exactly tau_season**2, a single full-season measurement, Level-2's
+    per-season mu) and confirm it reproduces xwoba_talent exactly. Load-bearing
+    correctness check that the multi-season Gaussian machinery collapses to the
+    Phase-1 EB estimator. NOTE: talent_table.parquet stores tau_season as
+    sqrt(tau2) (see src/talent.py build_talent_table), hence tau_season**2 below."""
+    p1 = pl.read_parquet(cfg.results_dir / "talent" / "talent_table.parquet")
+    xwoba_raw = p1["xwoba_raw"].to_numpy()
+    mu_season = p1["mu_season"].to_numpy()
+    meas_var = p1["se2"].to_numpy()             # Phase-1's per-row measurement variance
+    tau_season = p1["tau_season"].to_numpy()    # stored as sqrt(tau2)
+    xwoba_talent = p1["xwoba_talent"].to_numpy()
+
+    diffs = np.empty(p1.height)
+    for i in range(p1.height):
+        theta, _ = cutpoint_posterior(
+            np.array([xwoba_raw[i]]), np.array([mu_season[i]]), np.array([meas_var[i]]),
+            np.array([True]), se2=tau_season[i] ** 2, su2=0.0,
+        )
+        diffs[i] = abs(theta - xwoba_talent[i])
+    return {"max_diff": float(diffs.max()), "n": int(p1.height)}
+
+
+def run_scoring(cfg) -> dict:
+    """Task 10: score the sweep's forecast_table.parquet vs the five benchmarks,
+    compute by-band RMSE + interval coverage, evaluate the five pre-registered
+    gates, and write results/talent3/metrics.json. Reads the parquet the sweep
+    just wrote (not the in-memory frame) so this also runs standalone."""
+    outdir = cfg.results_dir / "talent3"
+    tbl = pl.read_parquet(outdir / "forecast_table.parquet")
+    sf = make_score_frame(tbl)
+
+    K_ORDER = [str(k) for k in CUTPOINTS]
+    W_ORDER = [f"{W_EDGES[i]:.1f}-{W_EDGES[i + 1]:.1f}" for i in range(len(W_EDGES) - 1)]
+
+    print("\nscoring vs benchmarks...")
+
+    # ---- RMSE: pooled (plain + calibrated), by k-band, by w-band ----------
+    a = tbl["r_final_actual"].to_numpy()
+    pooled_rmse = {}
+    for name in PREDS:
+        p = tbl[pred_col(name)].to_numpy()
+        pooled_rmse[name] = {"rmse": _rmse(p, a), "rmse_calibrated": _calibrated_rmse(p, a)}
+    rmse_by_k = rmse_by_band(sf, "k_band", K_ORDER)
+    rmse_by_w = rmse_by_band(sf, "w_band", W_ORDER)
+
+    # ---- coverage: (0.5, 0.8, 0.9) x (k_band, w_band) ----------------------
+    coverage_by_k: dict = {}
+    coverage_by_w: dict = {}
+    for level in (0.5, 0.8, 0.9):
+        ck = coverage_by_band(sf, "k_band", level)
+        cw = coverage_by_band(sf, "w_band", level)
+        coverage_by_k[str(level)] = {b: ck[b] for b in K_ORDER if b in ck}
+        coverage_by_w[str(level)] = {b: cw[b] for b in W_ORDER if b in cw}
+
+    # ---- cluster bootstrap over players (one fresh RNG, reused/advanced) --
+    score_rng = np.random.default_rng(cfg.seed)
+    sub_k100 = tbl.filter(pl.col("k") <= 100)
+    d_g1 = cluster_boot_delta(sub_k100, "r_final_naive", rng=score_rng)
+    d_g2 = cluster_boot_delta(tbl, "r_final_l2", rng=score_rng)
+    d_g3 = cluster_boot_delta(tbl, "r_final_marcel", rng=score_rng)
+
+    # ---- gates --------------------------------------------------------------
+    gates = [
+        _gate("G1_beats_naive_low_pa", d_g1["ci_lo"] > 0,
+              f"k<=100 (n={sub_k100.height}): delta {d_g1['delta']:+.5f} "
+              f"CI95 [{d_g1['ci_lo']:+.5f}, {d_g1['ci_hi']:+.5f}]"),
+        _gate("G2_beats_or_ties_l2", d_g2["ci_hi"] >= 0,
+              f"all rows (n={tbl.height}): delta {d_g2['delta']:+.5f} "
+              f"CI95 [{d_g2['ci_lo']:+.5f}, {d_g2['ci_hi']:+.5f}] [{_boot_label(d_g2)}]"),
+        _gate("G3_beats_or_ties_marcel", d_g3["ci_hi"] >= 0,
+              f"all rows (n={tbl.height}): delta {d_g3['delta']:+.5f} "
+              f"CI95 [{d_g3['ci_lo']:+.5f}, {d_g3['ci_hi']:+.5f}] [{_boot_label(d_g3)}]"),
+    ]
+    max_dev, bad = check_calibration(coverage_by_k, coverage_by_w)
+    gates.append(_gate("G4_calibration_5pp", len(bad) == 0,
+                       f"max |coverage-level| = {max_dev:.4f}"
+                       + (f"; OUT OF TOLERANCE: {'; '.join(bad)}" if bad
+                          else " (all (level,band) cells within +-0.05)")))
+    g5 = g5_check(cfg)
+    gates.append(_gate("G5_phase1_reduction", g5["max_diff"] < 1e-9,
+                       f"max|theta - xwoba_talent| = {g5['max_diff']:.3e} "
+                       f"over n={g5['n']} Phase-1 rows"))
+
+    eligible_counts_by_k = {str(k): tbl.filter(pl.col("k") == k).height for k in CUTPOINTS}
+    leakage = json.loads((outdir / "leakage_digest.json").read_text())
+
+    metrics = {
+        "gates": gates,
+        "pooled_rmse": pooled_rmse,
+        "rmse_by_k": rmse_by_k,
+        "rmse_by_w": rmse_by_w,
+        "coverage_by_k": coverage_by_k,
+        "coverage_by_w": coverage_by_w,
+        "paired_bootstrap": {
+            "G1_model_vs_naive_k<=100": d_g1,
+            "G2_model_vs_l2": d_g2,
+            "G3_model_vs_marcel": d_g3,
+        },
+        "g5": g5,
+        "eligible_counts_by_k": eligible_counts_by_k,
+        "leakage": leakage,
+    }
+    (outdir / "metrics.json").write_text(json.dumps(metrics, indent=2))
+
+    n_pass = sum(g["pass"] for g in gates)
+    print(f"\n  gate summary: {n_pass}/5 PASS")
+    failed = [g["name"] for g in gates if not g["pass"]]
+    if failed:
+        print(f"  gates NOT passing (reported as-is, not tuned to rescue): {failed}")
+    print(f"  wrote {outdir}/metrics.json")
+    return metrics
+
+
 def main():
     cfg = load_config()
     seasons = sorted(cfg.all_seasons)
@@ -264,6 +487,8 @@ def main():
     print(f"\n  LEAKAGE: assert_causal passed on all {tbl.height:,} forecasts "
           f"({n_cond:,} conditioning rows checked)")
     print(f"  wrote {outdir}/forecast_table.parquet + leakage_digest.json")
+
+    run_scoring(cfg)
 
 
 if __name__ == "__main__":

@@ -129,6 +129,21 @@ def cutpoint_posterior(z: np.ndarray, mu: np.ndarray, S: np.ndarray,
     return theta, max(V, 0.0)
 
 
+def coverage_by_band(tbl: pl.DataFrame, band_col: str, level: float,
+                     actual_col: str = "actual") -> dict:
+    """Empirical coverage of the central `level` interval per band: share of rows whose
+    `actual` falls within [q_lo, q_hi], where lo=(1-level)/2, hi=1-lo (keys 'q%02d')."""
+    lo = (1 - level) / 2
+    lo_key = f"q{round(lo * 100):02d}"
+    hi_key = f"q{round((1 - lo) * 100):02d}"
+    out = {}
+    for band, sub in tbl.group_by(band_col):
+        b = band[0] if isinstance(band, tuple) else band
+        hit = ((sub[actual_col] >= sub[lo_key]) & (sub[actual_col] <= sub[hi_key])).sum()
+        out[str(b)] = float(hit) / sub.height
+    return out
+
+
 def assert_causal(rows: pl.DataFrame, cutpoint_date, season_t: int) -> None:
     """Raise if any conditioning row leaks the future: a PA after the cutpoint date
     or a season strictly after the target season."""

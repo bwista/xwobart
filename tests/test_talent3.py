@@ -10,6 +10,7 @@ from src.talent3 import (
     FLOOR_SD_PER_PA,
     assert_causal,
     build_pa_frame,
+    coverage_by_band,
     cutpoint_posterior,
     cutpoint_split,
     fit_hypers_eb,
@@ -156,6 +157,17 @@ def test_posterior_no_history_reduces_to_1d_shrinkage():
     rel = tau2 / (tau2 + S[0])
     assert abs(theta - (mu[0] + rel * (z[0] - mu[0]))) < 1e-10
     assert abs(V - rel * S[0]) < 1e-10
+
+
+def test_coverage_by_band_counts_hits():
+    tbl = pl.DataFrame({
+        "band": ["50","50","100","100"],
+        "actual": [0.30, 0.40, 0.31, 0.36],
+        "q05": [0.25, 0.25, 0.28, 0.30], "q95": [0.35, 0.35, 0.34, 0.40],
+    })
+    cov = coverage_by_band(tbl, "band", 0.90)     # share within [q05,q95] per band
+    assert cov["50"] == 0.5      # .30 in, .40 out
+    assert cov["100"] == 1.0     # both in
 
 
 def test_assert_causal_flags_future_rows():
