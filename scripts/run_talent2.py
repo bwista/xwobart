@@ -267,7 +267,7 @@ def fig_peripheral_pull(figdir, base: pl.DataFrame):
     ax.text(0.99, 0.02, f"n={d.height:,} peripheral-path rows\n"
                         "(1-D fallback and floor-bound rows excluded)",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color=C_REF)
-    fig.tight_layout(); fig.savefig(figdir / "peripheral_pull.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "peripheral_pull.png", dpi=200); plt.close(fig)
 
 
 def fig_interval_width(figdir, base: pl.DataFrame) -> list[dict]:
@@ -297,7 +297,7 @@ def fig_interval_width(figdir, base: pl.DataFrame) -> list[dict]:
                  f"({min(pct):.0f}% to {max(pct):.0f}%)")
     ax.legend(frameon=False, fontsize=9)
     ax.grid(True, axis="y", color=C_REF, alpha=0.15)
-    fig.tight_layout(); fig.savefig(figdir / "interval_width_vs_pa.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "interval_width_vs_pa.png", dpi=200); plt.close(fig)
     return rows
 
 

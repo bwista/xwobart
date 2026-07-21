@@ -124,7 +124,7 @@ def fig_width_vs_pa(figdir: Path, df: pl.DataFrame, fit: dict,
     ax.grid(True, which="both", color=C_REF, alpha=0.15)
     ax.legend(frameon=False, fontsize=8.5)
     fig.tight_layout()
-    fig.savefig(figdir / "width_vs_pa_bootstrap_vs_model.png", dpi=120)
+    fig.savefig(figdir / "width_vs_pa_bootstrap_vs_model.png", dpi=200)
     plt.close(fig)
 
 
@@ -146,7 +146,7 @@ def fig_forest(figdir: Path, examples: pl.DataFrame) -> None:
     ax.grid(True, axis="x", color=C_REF, alpha=0.2)
     ax.legend(frameon=False, fontsize=8.5, loc="lower right")
     fig.tight_layout()
-    fig.savefig(figdir / "example_player_bands.png", dpi=120)
+    fig.savefig(figdir / "example_player_bands.png", dpi=200)
     plt.close(fig)
 
 

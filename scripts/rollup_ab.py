@@ -128,7 +128,7 @@ def fig_rmse_by_band(figdir: Path, by_band: list[dict]) -> None:
         ax.spines[s].set_visible(False)
     ax.legend(frameon=False, ncols=4, loc="upper center", bbox_to_anchor=(0.5, -0.13))
     fig.tight_layout()
-    fig.savefig(figdir / "next_season_rmse_by_band.png", dpi=120, bbox_inches="tight")
+    fig.savefig(figdir / "next_season_rmse_by_band.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
 
 

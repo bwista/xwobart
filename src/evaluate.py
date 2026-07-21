@@ -43,10 +43,30 @@ def brier_score(p: np.ndarray, y_ind: np.ndarray) -> float:
     return float(np.mean((p - y_ind) ** 2))
 
 
+def _reliability_panel(ax, name: str, curve: dict) -> None:
+    """One square reliability panel. Limits fit this class's own range — the old 1xK
+    strip used sharey, so the last class's set_ylim clipped the other curves. Marker
+    area tracks each bin's event count."""
+    lim = max(max(curve["conf"], default=0.1), max(curve["acc"], default=0.1)) * 1.15
+    ax.plot([0, lim], [0, lim], "--", color="grey", lw=1)
+    n = sum(curve["count"]) or 1
+    ax.plot(curve["conf"], curve["acc"], color="C0", lw=1, zorder=1)
+    ax.scatter(curve["conf"], curve["acc"], s=[15 + 200 * c / n for c in curve["count"]],
+               color="C0", zorder=2)
+    ax.set_xlim(0, lim); ax.set_ylim(0, lim); ax.set_aspect("equal")
+    ax.set_title(f"{name} (ece={curve['ece']:.3f})")
+    ax.set_xlabel("predicted prob"); ax.set_ylabel("observed frequency")
+
+
 def calibration(figdir: Path, p_mean: np.ndarray, y: np.ndarray, n_bins: int) -> dict:
-    """Per-class reliability curves + Brier + ECE on the holdout; weighted aggregate."""
+    """Per-class reliability curves + Brier + ECE on the holdout; weighted aggregate.
+    Bin curves (conf/acc/count) are serialized so the figure can be redrawn from
+    metrics.json alone, without re-scoring the holdout."""
     out: dict = {"per_class": {}}
-    fig, axes = plt.subplots(1, K, figsize=(4 * K, 4), sharey=True)
+    ncols = 3
+    nrows = -(-K // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 4 * nrows))
+    axes = np.asarray(axes).ravel()
     freq = np.bincount(y, minlength=K) / len(y)
     for c in range(K):
         y_ind = (y == c).astype(float)
@@ -55,17 +75,14 @@ def calibration(figdir: Path, p_mean: np.ndarray, y: np.ndarray, n_bins: int) ->
             "brier": brier_score(p_mean[:, c], y_ind),
             "ece": curve["ece"],
             "bin_counts": curve["count"],
+            "bin_conf": curve["conf"],
+            "bin_acc": curve["acc"],
         }
-        ax = axes[c]
-        ax.plot([0, 1], [0, 1], "--", color="grey", lw=1)
-        ax.plot(curve["conf"], curve["acc"], "o-")
-        ax.set_title(f"{CLASS_NAMES[c]} (n bins={len(curve['count'])})")
-        ax.set_xlabel("predicted prob")
-        lim = max(max(curve["conf"], default=0.1), max(curve["acc"], default=0.1)) * 1.15
-        ax.set_xlim(0, lim); ax.set_ylim(0, lim)
-    axes[0].set_ylabel("observed frequency")
+        _reliability_panel(axes[c], CLASS_NAMES[c], curve)
+    for ax in axes[K:]:
+        ax.set_visible(False)
     fig.tight_layout()
-    fig.savefig(figdir / "calibration_reliability.png", dpi=120)
+    fig.savefig(figdir / "calibration_reliability.png", dpi=200)
     plt.close(fig)
     out["ece_weighted"] = float(sum(freq[c] * out["per_class"][CLASS_NAMES[c]]["ece"] for c in range(K)))
     return out
@@ -115,7 +132,7 @@ def replication(figdir: Path, *, ev_mean_train, public_train, ev_mean_hold, publ
         ax.set_xlabel("estimated_woba_using_speedangle (Savant)")
         ax.set_ylabel("posterior-mean expected value (model)")
         ax.set_title(f"event-level replication — {tag} (r={out[f'event_r_{tag}']:.3f})")
-        fig.savefig(figdir / f"replication_event_{tag}.png", dpi=120)
+        fig.savefig(figdir / f"replication_event_{tag}.png", dpi=200)
         plt.close(fig)
 
     pt = player_table.filter(pl.col("PA") >= min_pa).drop_nulls("xwoba_savant")
@@ -130,7 +147,7 @@ def replication(figdir: Path, *, ev_mean_train, public_train, ev_mean_hold, publ
     ax.plot([0.2, 0.5], [0.2, 0.5], "--", color="grey", lw=1)
     ax.set_xlabel("public xwOBA (Savant)"); ax.set_ylabel("rollup posterior mean")
     ax.legend(); ax.set_title(f"player-season replication ({min_pa}+ PA)")
-    fig.savefig(figdir / "replication_player.png", dpi=120)
+    fig.savefig(figdir / "replication_player.png", dpi=200)
     plt.close(fig)
 
     out["residual_by_ev"] = binned_residuals(ev_mean_hold, public_hold, ls_hold, 40, 120, 2.5)
@@ -143,7 +160,7 @@ def replication(figdir: Path, *, ev_mean_train, public_train, ev_mean_hold, publ
         ax.plot([r["bin_lo"] for r in rows], [r["mean_residual"] for r in rows], "o-")
         ax.set_xlabel(lab); ax.set_ylabel("mean(model - public)")
     fig.suptitle("holdout residual structure vs EV / LA bins")
-    fig.savefig(figdir / "replication_residual_bins.png", dpi=120)
+    fig.savefig(figdir / "replication_residual_bins.png", dpi=200)
     plt.close(fig)
     return out
 
@@ -212,13 +229,16 @@ def localization(figdir: Path, s: np.ndarray, grounder_ev: np.ndarray, barrel_ev
                              ("barrel (103, 28)", barrel_ev, "C1")):
         mean = evd.mean(axis=0)
         q05, q95 = np.quantile(evd, [0.05, 0.95], axis=0)
-        ax.plot(s, mean, color=color, label=name)
-        ax.fill_between(s, q05, q95, color=color, alpha=0.2)
         slope = float(np.polyfit(s, mean, 1)[0])
         out[("grounder" if "grounder" in name else "barrel") + "_slope_per_ftps"] = slope
+        ax.plot(s, mean, color=color, label=f"{name} — slope {slope:+.4f}/ft/s")
+        ax.fill_between(s, q05, q95, color=color, alpha=0.2)
     ax.set_xlabel("sprint speed (ft/s)"); ax.set_ylabel("expected wOBA value")
-    ax.legend(); ax.set_title("sprint-speed localization (90% credible bands)")
-    fig.savefig(figdir / "sprint_localization_curves.png", dpi=120)
+    ax.legend()
+    ax.set_title("sprint speed should pay only where legs change the outcome\n"
+                 "(topped grounders tilt up, barrels stay flat — 90% credible bands)")
+    fig.tight_layout()
+    fig.savefig(figdir / "sprint_localization_curves.png", dpi=200)
     plt.close(fig)
 
     for label, codes in (("weak_topped", (1, 2)), ("solid_barrel", (5, 6))):
@@ -239,10 +259,18 @@ def variable_importance(figdir: Path, model, idata, X: np.ndarray,
 
         vi = pmb.compute_variable_importance(idata, model["mu"], X)
         axes = pmb.plot_variable_importance(vi)
-        fig = (axes[0] if isinstance(axes, (list, np.ndarray)) else axes).figure
-        fig.savefig(figdir / "variable_importance.png", dpi=120)
-        plt.close(fig)
+        ax = axes[0] if isinstance(axes, (list, np.ndarray)) else axes
+        fig = ax.figure
         labels = labels or ["launch_speed", "launch_angle", "sprint_speed"]
+        # pmb ticks the x axis with bare feature indices ("1", "+ 0", ...) — translate
+        # to feature names in the same most-important-first order.
+        order = [int(i) for i in np.asarray(vi["indices"]).ravel()]
+        if len(order) == len(labels):
+            names = [labels[order[0]]] + [f"+ {labels[i]}" for i in order[1:]]
+            ax.set_xticks(range(len(names)))
+            ax.set_xticklabels(names, fontsize=9)
+        fig.savefig(figdir / "variable_importance.png", dpi=200)
+        plt.close(fig)
         # Keep only small summary fields. compute_variable_importance also returns large
         # per-event `preds`/`preds_all` arrays (for plotting) that bloat metrics.json to
         # ~100s of MB — never serialize those.

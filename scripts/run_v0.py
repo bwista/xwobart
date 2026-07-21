@@ -279,7 +279,7 @@ def main() -> None:
         ax.set_ylabel("launch_angle (deg)")
         ax.set_title("HR band in LA x spray (RHB, EV 103 mph)")
         fig.tight_layout()
-        fig.savefig(figdir / "pdp_la_spray_hr.png", dpi=120)
+        fig.savefig(figdir / "pdp_la_spray_hr.png", dpi=200)
         plt.close(fig)
         metrics["pdp_hr_band"] = {
             "max_p_hr": float(hr.max()),

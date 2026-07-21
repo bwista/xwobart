@@ -165,7 +165,7 @@ def fig_bars(figdir: Path, pooled: dict, per_pair: dict) -> None:
     ax2.grid(True, axis="y", color=C_NAIVE, alpha=0.2)
     ax2.legend(frameon=False, fontsize=8)
     fig.tight_layout()
-    fig.savefig(figdir / "predictive_accuracy.png", dpi=120)
+    fig.savefig(figdir / "predictive_accuracy.png", dpi=200)
     plt.close(fig)
 
 

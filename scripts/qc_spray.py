@@ -126,7 +126,7 @@ def main() -> None:
     ax.set_xlabel("spray_pull (deg; POSITIVE = pulled)"); ax.set_ylabel("density")
     ax.set_title("2024 pull-relative spray - both hands must lean positive")
     ax.legend(frameon=False)
-    fig.tight_layout(); fig.savefig(figdir / "spray_by_hand.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "spray_by_hand.png", dpi=200); plt.close(fig)
 
     # Figure 2: raw direction on home runs (the asymmetry BART needs `stand` to see)
     fig, ax = plt.subplots(figsize=(7, 5))
@@ -139,7 +139,7 @@ def main() -> None:
     ax.set_xlabel("phi_raw (deg; negative = LEFT field)"); ax.set_ylabel("density")
     ax.set_title("2024 home runs, RAW direction - opposite peaks by hand")
     ax.legend(frameon=False)
-    fig.tight_layout(); fig.savefig(figdir / "spray_hr_raw_direction.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "spray_hr_raw_direction.png", dpi=200); plt.close(fig)
 
     (outdir / "spray_qc.json").write_text(json.dumps(
         {"per_season": per_season, "named_2024": named,

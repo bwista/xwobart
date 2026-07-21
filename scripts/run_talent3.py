@@ -529,7 +529,7 @@ def fig_fan_chart(figdir: Path, tbl: pl.DataFrame, names: pl.DataFrame) -> None:
     fig.suptitle("Final-line forecast fan narrows onto the realized number as the season plays out",
                 fontsize=12.5)
     fig.tight_layout(rect=(0.0, 0.05, 1.0, 0.96))
-    fig.savefig(figdir / "fan_chart_examples.png", dpi=120)
+    fig.savefig(figdir / "fan_chart_examples.png", dpi=200)
     plt.close(fig)
 
 
@@ -559,7 +559,7 @@ def fig_calibration_by_band(figdir: Path, metrics: dict) -> None:
         ax.grid(True, color=C_REF, alpha=0.15)
     fig.suptitle("50/80% intervals run narrow (undercoverage); the 90% band holds", fontsize=12.5)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
-    fig.savefig(figdir / "calibration_by_band.png", dpi=120)
+    fig.savefig(figdir / "calibration_by_band.png", dpi=200)
     plt.close(fig)
 
 
@@ -603,7 +603,7 @@ def fig_width_vs_pa_and_w(figdir: Path, sf: pl.DataFrame) -> None:
     ax2.legend(frameon=False, fontsize=8.5); ax2.grid(True, color=C_REF, alpha=0.15)
 
     fig.tight_layout()
-    fig.savefig(figdir / "width_vs_pa_and_w.png", dpi=120)
+    fig.savefig(figdir / "width_vs_pa_and_w.png", dpi=200)
     plt.close(fig)
 
 
@@ -642,7 +642,7 @@ def fig_rmse_vs_benchmarks(figdir: Path, metrics: dict) -> None:
     ax2.grid(True, color=C_REF, alpha=0.15)
 
     fig.tight_layout()
-    fig.savefig(figdir / "rmse_vs_benchmarks.png", dpi=120)
+    fig.savefig(figdir / "rmse_vs_benchmarks.png", dpi=200)
     plt.close(fig)
 
 

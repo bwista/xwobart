@@ -169,7 +169,7 @@ def fig_width_vs_pa(figdir: Path, df: pl.DataFrame, fit: dict, bins: list[dict])
     ax.grid(True, which="both", color=C_REF, alpha=0.15)
     ax.legend(frameon=False, fontsize=9)
     fig.tight_layout()
-    fig.savefig(figdir / "interval_width_vs_pa.png", dpi=120)
+    fig.savefig(figdir / "interval_width_vs_pa.png", dpi=200)
     plt.close(fig)
 
 
@@ -193,7 +193,7 @@ def fig_disagreement(figdir: Path, top: pl.DataFrame) -> None:
                        Patch(color=C_NEG, label="model lower")],
               frameon=False, fontsize=8, loc="lower right")
     fig.tight_layout()
-    fig.savefig(figdir / "disagreement_leaderboard.png", dpi=120)
+    fig.savefig(figdir / "disagreement_leaderboard.png", dpi=200)
     plt.close(fig)
 
 

@@ -38,7 +38,7 @@ def fig_shrinkage(figdir, tbl):
     ax.set_xlabel("PA"); ax.set_ylabel("xwOBA"); ax.set_xscale("log")
     ax.set_title("Shrinkage: small samples pulled toward the mean (2024)")
     ax.legend(frameon=False, fontsize=9)
-    fig.tight_layout(); fig.savefig(figdir / "shrinkage_raw_to_talent.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "shrinkage_raw_to_talent.png", dpi=200); plt.close(fig)
 
 
 def fig_reliability(figdir, tbl):
@@ -47,7 +47,7 @@ def fig_reliability(figdir, tbl):
     ax.set_xlabel("PA"); ax.set_ylabel("reliability  τ²/(τ²+SE²)")
     ax.set_title("Reliability rises with sample size")
     ax.grid(True, color=C_REF, alpha=0.15)
-    fig.tight_layout(); fig.savefig(figdir / "reliability_vs_pa.png", dpi=120); plt.close(fig)
+    fig.tight_layout(); fig.savefig(figdir / "reliability_vs_pa.png", dpi=200); plt.close(fig)
 
 
 PREDS = ("xwoba_talent", "xwoba_raw", "xwoba_savant")
