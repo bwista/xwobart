@@ -27,3 +27,26 @@ def build_pa_frame(pitches: pl.DataFrame) -> pl.DataFrame:
         .select("batter", season="game_year", game_date="game_date",
                 value="value", denom="woba_denom")
     )
+
+
+def cutpoint_split(pas: pl.DataFrame, k: int, min_remaining: float) -> dict | None:
+    """Order one player-season's PAs by game_date, split first-k (observed) vs rest
+    (remaining). Returns a dict with r_obs/D_obs, r_rest/D_rest (realized), w, and
+    the raw observed/remaining value+denom arrays. None if fewer than k+1 PAs or the
+    remaining denom < min_remaining (no real 'rest of season')."""
+    o = pas.sort("game_date", maintain_order=True)   # stable: ties keep input order
+    n = o.height
+    if n <= k:
+        return None
+    v = o["value"].to_numpy(); d = o["denom"].to_numpy()
+    v_obs, d_obs = v[:k], d[:k]
+    v_rest, d_rest = v[k:], d[k:]
+    D_obs, D_rest = float(d_obs.sum()), float(d_rest.sum())
+    if D_rest < min_remaining or D_obs <= 0:
+        return None
+    return {
+        "r_obs": float(v_obs.sum() / D_obs), "D_obs": D_obs,
+        "r_rest": float(v_rest.sum() / D_rest), "D_rest": D_rest,
+        "w": D_rest / (D_obs + D_rest),
+        "v_obs": v_obs, "d_obs": d_obs, "v_rest": v_rest, "d_rest": d_rest,
+    }
