@@ -293,7 +293,7 @@ git commit -m "feat(talent3): cutpoint split with game_date ordering and eligibi
 
 ```python
 # add to tests/test_talent3.py
-from src.talent3 import sample_measurement
+from src.talent3 import sample_measurement, FLOOR_SD_PER_PA   # re-exported from talent2
 
 def test_sample_measurement_matches_bootstrap_S_diag():
     rng = np.random.default_rng(0)
@@ -631,8 +631,8 @@ def forward_forecast(theta_hat: float, V: float, r_obs: float, w: float,
     out = {"center": float(np.median(finals))}
     for lv in levels:
         lo, hi = (1 - lv) / 2, 1 - (1 - lv) / 2
-        out[f"q{int(lo*100):02d}"] = float(np.quantile(finals, lo))
-        out[f"q{int(hi*100):02d}"] = float(np.quantile(finals, hi))
+        out[f"q{round(lo*100):02d}"] = float(np.quantile(finals, lo))
+        out[f"q{round(hi*100):02d}"] = float(np.quantile(finals, hi))
     return out
 
 
@@ -640,11 +640,11 @@ def _level_keys(levels):
     keys = []
     for lv in levels:
         lo = (1 - lv) / 2
-        keys += [f"q{int(lo*100):02d}", f"q{int((1-lo)*100):02d}"]
+        keys += [f"q{round(lo*100):02d}", f"q{round((1-lo)*100):02d}"]
     return keys
 ```
 
-*Note:* levels (.5,.8,.9) → keys q25/q75, q10/q90, q05/q95. The test uses q10/q90 (80%). Confirm key names match before writing the metrics task.
+*Note — use `round()`, NOT `int()`:* `int((1-0.8)/2*100) == 9` (float repr gives `9.999…`), which would emit `q09`/`q04`. `round()` yields the intended keys: levels (.5, .8, .9) → `q25`/`q75`, `q10`/`q90`, `q05`/`q95`. These exact key names are consumed by the coverage scoring in Task 10 — keep them identical in both places.
 
 - [ ] **Step 4: Run to verify it passes.** (Coverage test is stochastic; if it flakes at the boundary, widen tolerance to [0.70, 0.90] — the point is *approximate* nominal coverage, not a tight estimate.)
 
@@ -670,10 +670,18 @@ git commit -m "feat(forecast): forward-bootstrap final-line predictive interval"
 ```python
 # tests/test_benchmarks.py
 import numpy as np
-from src.benchmarks import naive, marcel
+from src.benchmarks import naive, marcel, league_shrunk
 
 def test_naive_is_observed_rate():
     assert naive(0.351) == 0.351
+
+def test_league_shrunk_matches_phase1_formula():
+    # rel = tau2/(tau2+s00); theta = mu + rel*(z-mu). Reproduces talent.eb_shrink.
+    z, s00, mu, tau2 = 0.400, 0.050 ** 2, 0.315, 0.031 ** 2
+    rel = tau2 / (tau2 + s00)
+    assert abs(league_shrunk(z, s00, mu, tau2) - (mu + rel * (z - mu))) < 1e-12
+    # huge measurement variance -> shrinks fully to mu
+    assert abs(league_shrunk(0.9, 10.0, 0.315, tau2) - 0.315) < 1e-3
 
 def test_marcel_weights_and_regression():
     # one prior season rate .340 over 400 denom; current .360 over 100 denom;
@@ -706,6 +714,14 @@ def naive(r_obs: float) -> float:
     return r_obs
 
 
+def league_shrunk(z: float, s00: float, mu: float, tau2: float) -> float:
+    """Phase-1 EB shrink of the first-k rate z toward the season mean mu (reproduces
+    talent.eb_shrink). tau2 is the per-season between-player variance (fit once via
+    talent.eb_fit on the season and passed in by the script). rel = tau2/(tau2+s00)."""
+    rel = tau2 / (tau2 + s00)
+    return mu + rel * (z - mu)
+
+
 def marcel(prior_rates, prior_denoms, cur_rate: float, cur_denom: float,
            mu: float, regress_pa: float = 200.0, weights=(5, 4, 3)) -> float:
     """Marcel-style projection: recency-weighted mean of {prior seasons (most recent
@@ -730,7 +746,7 @@ def marcel(prior_rates, prior_denoms, cur_rate: float, cur_denom: float,
 
 ```bash
 git add src/benchmarks.py tests/test_benchmarks.py
-git commit -m "feat(benchmarks): naive and Marcel rest-of-season baselines"
+git commit -m "feat(benchmarks): naive, league-shrunk, and Marcel rest-of-season baselines"
 ```
 
 ---
@@ -807,6 +823,22 @@ Then `scripts/run_talent3.py` (structure — mirror `run_talent2.py`; full body 
 #   write results/talent3/forecast_table.parquet ; stamp leakage digest in metrics
 ```
 
+**Benchmark wiring (the two non-pure ones — be concrete, this is the thinnest part):**
+- `single_season_l2`: reuse `talent2` *without a per-cutpoint refit*. Fit talent2's per-season
+  `μ`/`Σ` **once** (via `talent2.build_talent2_table` on full seasons, or read them from
+  `results/talent2/talent2_metrics.json`), then for each (player, *k*) build the first-*k* peripheral
+  measurement (`talent2.build_pa_measurements` + `assemble_measurements` restricted to the first-*k*
+  slice) and shrink with `talent2.mvn_posterior(z_firstk, S_firstk, μ, Σ)`. This is the 3-D
+  single-season estimate from partial data — the G2 secondary bar. (If the peripheral bootstrap on
+  thin *k* slices is fiddly, its 1-D fallback ≡ `league_shrunk`, which is already covered.)
+- `savant_to_date`: Savant's season xwOBA through the cutpoint = the pooled
+  `estimated_woba_using_speedangle`-based rate over the first-*k* PAs, i.e. exactly `cp["r_obs"]`
+  computed on Savant values (which equals our `r_obs` since we already use Savant values for BBE).
+  So `savant_to_date == naive` here — record that they coincide rather than duplicating a column.
+- **φ sensitivity check (spec §7, defer-friendly):** the primary fit is LOSO; add a `--phi-strict`
+  flag that refits `φ` on seasons `< t` only and re-scores, to confirm the small expected move. Not
+  required for the headline run; wire the flag, leave the analysis to NOTES.
+
 - [ ] **Step 4: Run to verify** — `.venv/bin/python -m pytest tests/test_talent3.py -v` (unit) then `.venv/bin/python scripts/run_talent3.py` produces `results/talent3/forecast_table.parquet`. Print row count and eligible-pair counts per (season, k) band.
 
 - [ ] **Step 5: Commit**
@@ -826,10 +858,19 @@ git commit -m "feat(talent3): validation sweep with LOSO hypers and leakage guar
 
 **Context (spec §9):** From `forecast_table`, compute point RMSE of `r_final` vs actual for the model and each benchmark, by **PA-seen** (*k*) and **w** band, pooled, with a paired bootstrap over players (reuse `run_talent2.paired_bootstrap` pattern). Coverage of the 50/80/90 intervals by band (share of actuals within `[q_lo, q_hi]`, target within ±5pp). Gates:
 - **G1** model beats naive on final-line RMSE at low PA-seen (k≤100), paired-bootstrap CI excludes 0.
-- **G2** model beats/ties single-season L2.
+- **G2** model beats/ties the clean multi-year control. Rung a is xwOBA-only (1-D), so the clean
+  isolation of the *history* lever is **rung a with history stripped** (η removed → 1-D
+  single-season, ≡ Phase 1): compute both variants and compare (paired bootstrap). ALSO report vs the
+  shipped 3-D single-season Level 2 (`results/talent2`) as a secondary bar (does 1-D+history reach
+  peripheral-3-D?), but do **not** read the 3-D gap as "the lever" — it confounds history with
+  peripherals.
 - **G3** model beats/ties Marcel.
 - **G4** coverage within ±5pp at 50/80/90 across bands.
-- **G5** with history stripped (η removed) at the full-season cutpoint and `μ_t`=full-season league mean, estimates match `results/talent2` to tolerance.
+- **G5** with history stripped (η removed) at the full-season cutpoint and `μ_t` = full-season league
+  mean, estimates match the **1-D single-season shrinkage** — i.e. **Phase 1** (`results/talent`,
+  `xwoba_talent`), which is exactly what the reduction targets. (Spec §9 says "match talent2"; that
+  means talent2's D=1 *fallback* path, which **is** Phase 1 — talent2's stored `xwoba_talent2` is the
+  3-D peripheral posterior and is the wrong comparison for a 1-D reduction, so use Phase 1's table.)
 
 - [ ] **Step 1: Write the failing test** (a pure scoring helper)
 
