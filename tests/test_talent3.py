@@ -43,3 +43,24 @@ def test_cutpoint_split_ineligible_when_no_runway():
     f = build_pa_frame(_pitches()).filter(pl.col("batter") == 2)
     assert cutpoint_split(f, k=1, min_remaining=5) is None   # only 1 remaining PA
     assert cutpoint_split(f, k=2, min_remaining=1) is None   # nothing remaining
+
+
+def test_sample_measurement_matches_bootstrap_S_diag():
+    from src.talent3 import sample_measurement, FLOOR_SD_PER_PA
+    rng = np.random.default_rng(0)
+    v = np.array([1.2, 0.1, 0.69, 0.0, 2.0, 0.0]); d = np.ones_like(v)
+    z, s00 = sample_measurement(v, d, B=500, rng=rng)
+    assert abs(z - v.sum() / d.sum()) < 1e-12
+    # equals bootstrap_S[0,0] under the same seed
+    from src.talent2 import bootstrap_S
+    nan = np.full_like(v, np.nan)
+    S = bootstrap_S(v, d, nan, nan, B=500, rng=np.random.default_rng(0))
+    assert abs(s00 - S[0, 0]) < 1e-12
+
+
+def test_sample_measurement_floor_binds_on_degenerate_sample():
+    from src.talent3 import sample_measurement, FLOOR_SD_PER_PA
+    rng = np.random.default_rng(1)
+    v = np.array([0.0, 0.0]); d = np.array([1.0, 1.0])   # zero variation
+    _, s00 = sample_measurement(v, d, B=200, rng=rng)
+    assert abs(s00 - FLOOR_SD_PER_PA ** 2 / 2) < 1e-12   # floored, not zero

@@ -50,3 +50,13 @@ def cutpoint_split(pas: pl.DataFrame, k: int, min_remaining: float) -> dict | No
         "w": D_rest / (D_obs + D_rest),
         "v_obs": v_obs, "d_obs": d_obs, "v_rest": v_rest, "d_rest": d_rest,
     }
+
+
+def sample_measurement(value: np.ndarray, denom: np.ndarray, B: int,
+                       rng: np.random.Generator) -> tuple[float, float]:
+    """Measurement (rate) and its floored bootstrap sampling variance for one PA
+    sample. xwOBA-only: reuse bootstrap_S with NaN peripherals and take S[0,0]."""
+    nan = np.full(len(value), np.nan)
+    S = bootstrap_S(value, denom, nan, nan, B=B, rng=rng)
+    z = float(value.sum() / denom.sum())
+    return z, float(S[0, 0])
