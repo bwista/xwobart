@@ -455,6 +455,8 @@ def run_scoring(cfg) -> dict:
                        f"over n={g5['n']} Phase-1 rows"))
 
     eligible_counts_by_k = {str(k): tbl.filter(pl.col("k") == k).height for k in CUTPOINTS}
+    n_pairs = tbl.select(["batter", "season"]).unique().height   # unique (batter, season) forecast targets
+    n_batters = int(tbl["batter"].n_unique())
     leakage = json.loads((outdir / "leakage_digest.json").read_text())
 
     metrics = {
@@ -471,6 +473,8 @@ def run_scoring(cfg) -> dict:
         },
         "g5": g5,
         "eligible_counts_by_k": eligible_counts_by_k,
+        "n_pairs": n_pairs,
+        "n_batters": n_batters,
         "leakage": leakage,
     }
     (outdir / "metrics.json").write_text(json.dumps(metrics, indent=2))

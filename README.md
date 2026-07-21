@@ -80,11 +80,10 @@ unmoved by a BART refit.
 
 ## The notebooks
 
-`notebooks/01–05` are the readable walk-through of arcs 1–5 above, committed **with
+`notebooks/01–07` are the readable walk-through of all seven arcs above, committed **with
 outputs embedded** so everything is viewable on GitHub without running anything. Each
 ends with a guard cell that asserts the prose's numbers against the artifacts. See
-`notebooks/README.md` for the reading order. Arcs 6–7 (spray, forecast) are not yet
-notebook-ized — their write-ups live in `results/RESULTS.md` and the per-layer NOTES.
+`notebooks/README.md` for the reading order.
 
 ## Setup
 

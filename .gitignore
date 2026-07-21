@@ -9,6 +9,5 @@ results/**/*.pkl
 results/**/ev_draws_keys_*.parquet
 results/talent3/*.parquet
 results/talent3/leakage_digest.json
-results/talent3/metrics.json
 .pytest_cache/
 .DS_Store

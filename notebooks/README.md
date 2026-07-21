@@ -36,6 +36,8 @@ silently drift.
 | 03 | `03_uncertainty_bands.ipynb` | v0's model interval is **flat in PA** (wrong object); a **bootstrap over a player's PAs** narrows correctly with sample size | `results/task_a/`, `results/player_ci/` |
 | 04 | `04_talent_estimates.ipynb` | **Phase 1 empirical-Bayes true-talent xwOBA** — shrinkage, reliability, examples, and the next-season validation (beats raw; ties Savant, beats it at low PA) | `results/talent/` |
 | 05 | `05_level2_talent.ipynb` | **Phase 2 / Stage 1** — shrink toward what the *contact* implies (joint MVN over xwOBA + exit velo + barrel rate) instead of the league mean; gain concentrated at low PA (+0.072 at 30–60), the shared-noise tripwire, and why the win isn't statistically established | `results/talent2/` |
+| 06 | `06_spray_surface.ipynb` | **Spray surface — a documented negative** — do spray direction + handedness beat the parity wall? Measured against the sampler's own ~267-nat run-to-run noise floor, the 5-feature refit buys no held-out likelihood (calibration worsens, replication drops) even though the model *learns* spray (importance #3, a pulled-air HR gradient); spray-conditioned rollups also lose to marginalized, and both lose to v0 | `results/stage2_rebuild/`, `results/stage_C_spray/`, `results/rollup_ab/` |
+| 07 | `07_ros_forecast.ipynb` | **Rest-of-season forecast** — stand at a hitter's first *k* PAs and forecast his final full-season xwOBA with a calibrated range, adding a **career random intercept** over his prior seasons. Beats naive, Marcel and single-season Level 2 (bootstrap CIs exclude 0); G5 reduces to Phase 1 exactly, but the 50%/80% intervals run narrow — a real, open calibration failure | `results/talent3/` |
 
 ## The arc in one paragraph
 
@@ -49,6 +51,16 @@ fast-stabilizing peripherals (exit velo, barrel rate) into the prior, so a rooki
 the ball regresses toward a slugger (05). That help lands exactly where the sample is thin
 (+0.072 r at 30–60 PA, nothing at 250+) and the tripwire for the obvious failure mode came
 back clean — though the pooled effect is small and one holdout season disagrees.
+
+Then two more arcs, both honest about their limits. **06** finally cashes in the promise from
+02 — feed the surface the inputs Savant lacks, spray direction and handedness — and it's a
+negative told properly: measured against the sampler's own run-to-run noise floor, a 5-feature
+BART refit buys no held-out accuracy even though it demonstrably learns spray, so the parity
+wall still stands. **07** changes the question from describing a season to forecasting one —
+from a hitter's first *k* PAs, predict his final xwOBA with a range that tightens as the season
+plays out, adding a career random intercept over his prior seasons; it beats Marcel and
+single-season Level 2 with bootstrap CIs that exclude zero, while its 50%/80% intervals run
+narrow, a documented and still-open calibration miss.
 
 Note the design that *didn't* survive: shrinking toward the BART model's own xwOBA was a
 structural no-op (the surface is built from the same batted balls as the raw number), so the

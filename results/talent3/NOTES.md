@@ -3,6 +3,13 @@
 Date: 2026-07-21 · No BART re-fit. Reproduce: `.venv/bin/python scripts/run_talent3.py`
 → `results/talent3/{figures/, forecast_table.parquet, metrics.json, leakage_digest.json}`.
 
+> **Re-run note (2026-07-21).** The committed `metrics.json` and figures are from a faithful
+> re-run on complete 2025 data. The original run's 2025 tail has since been revised in Statcast,
+> so the re-run yields **7,499** forecasts vs the **7,493** quoted in the prose below (+6); the
+> (batter, season) set (**1,945** pairs / **778** batters) and every gate verdict are unchanged,
+> and all bootstrap deltas move by ≤0.00002. `notebooks/07_ros_forecast.ipynb` presents and
+> guards the re-run values.
+
 Design: `docs/superpowers/specs/2026-07-20-xwobart-rest-of-season-forecast-design.md` ·
 Plan: `docs/superpowers/plans/2026-07-20-xwobart-rest-of-season-forecast.md`. Rung (a) of the
 model (spec §6): career pooling + iid season drift, xwOBA-only, no aging.
