@@ -98,3 +98,26 @@ def fit_hypers_eb(y: np.ndarray, S: np.ndarray, player_idx: np.ndarray
                    method="L-BFGS-B", options={"maxiter": 200})
     se2, su2 = np.exp(res.x)
     return float(se2), float(su2)
+
+
+def cutpoint_posterior(z: np.ndarray, mu: np.ndarray, S: np.ndarray,
+                       is_current: np.ndarray, se2: float, su2: float
+                       ) -> tuple[float, float]:
+    """Posterior (theta_hat, V) of theta_{i,t}=mu_t+eta+u_t given demeaned
+    measurements y=z-mu with per-obs variance S. Latent x=(eta, u_1..u_J); the
+    current season's u is the last component. Closed-form Gaussian conditioning."""
+    J = len(z)
+    P = np.diag(np.concatenate([[se2], np.full(J, su2)]))      # (J+1, J+1)
+    H = np.zeros((J, J + 1))
+    H[:, 0] = 1.0                                              # eta loads on all
+    H[np.arange(J), 1 + np.arange(J)] = 1.0                    # each obs -> its own u
+    R = np.diag(S)
+    y = z - mu
+    Kf = P @ H.T @ np.linalg.inv(H @ P @ H.T + R)
+    xhat = Kf @ y
+    Vx = P - Kf @ H @ P
+    cur = int(np.where(is_current)[0][0])                      # index of current season
+    sel = np.zeros(J + 1); sel[0] = 1.0; sel[1 + cur] = 1.0    # eta + u_current
+    theta = float(mu[cur] + sel @ xhat)
+    V = float(sel @ Vx @ sel)
+    return theta, max(V, 0.0)

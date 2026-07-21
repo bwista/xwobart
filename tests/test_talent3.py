@@ -97,3 +97,35 @@ def test_fit_hypers_recovers_known_variances():
     est_eta2, est_u2 = fit_hypers_eb(np.array(ys), np.array(Ss), np.array(pid))
     assert abs(np.sqrt(est_eta2) - sig_eta) < 0.006   # within ~1 sampling SE
     assert abs(np.sqrt(est_u2) - sig_u) < 0.006
+
+
+from src.talent3 import cutpoint_posterior
+
+
+def test_posterior_matches_brute_force_gaussian():
+    se2, su2 = 0.030 ** 2, 0.015 ** 2
+    # prior seasons: two measurements; current: one truncated measurement
+    zs = np.array([0.360, 0.330, 0.345]); mus = np.array([0.315, 0.318, 0.320])
+    Ss = np.array([0.020 ** 2, 0.022 ** 2, 0.045 ** 2])   # current (last) is noisier
+    is_current = np.array([False, False, True])
+    theta, V = cutpoint_posterior(zs, mus, Ss, is_current, se2, su2)
+
+    # brute force: latent x=(eta,u0,u1,u_t); build joint, condition on y=z-mu
+    P = np.diag([se2, su2, su2, su2])
+    H = np.array([[1,1,0,0],[1,0,1,0],[1,0,0,1]], float)
+    R = np.diag(Ss); y = zs - mus
+    Kf = P @ H.T @ np.linalg.inv(H @ P @ H.T + R)
+    xhat = Kf @ y; Vx = P - Kf @ H @ P
+    sel = np.array([1,0,0,1], float)   # eta + u_t
+    assert abs(theta - (mus[-1] + sel @ xhat)) < 1e-10
+    assert abs(V - sel @ Vx @ sel) < 1e-10
+
+def test_posterior_no_history_reduces_to_1d_shrinkage():
+    # single current measurement, no prior seasons → Phase-1/L2 1-D shrink toward mu_t
+    se2, su2 = 0.030 ** 2, 0.015 ** 2
+    z, mu, S = np.array([0.400]), np.array([0.315]), np.array([0.050 ** 2])
+    theta, V = cutpoint_posterior(z, mu, S, np.array([True]), se2, su2)
+    tau2 = se2 + su2                       # prior var of (eta+u_t) with no history
+    rel = tau2 / (tau2 + S[0])
+    assert abs(theta - (mu[0] + rel * (z[0] - mu[0]))) < 1e-10
+    assert abs(V - rel * S[0]) < 1e-10
