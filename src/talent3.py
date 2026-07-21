@@ -127,3 +127,14 @@ def cutpoint_posterior(z: np.ndarray, mu: np.ndarray, S: np.ndarray,
     theta = float(mu[cur] + sel @ xhat)
     V = float(sel @ Vx @ sel)
     return theta, max(V, 0.0)
+
+
+def assert_causal(rows: pl.DataFrame, cutpoint_date, season_t: int) -> None:
+    """Raise if any conditioning row leaks the future: a PA after the cutpoint date
+    or a season strictly after the target season."""
+    if rows.height == 0:
+        return
+    assert rows.filter(pl.col("game_date") > cutpoint_date).height == 0, \
+        "leak: conditioning PA after cutpoint date"
+    assert rows.filter(pl.col("season") > season_t).height == 0, \
+        "leak: conditioning row from a later season"

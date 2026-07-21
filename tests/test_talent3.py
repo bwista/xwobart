@@ -1,3 +1,5 @@
+import datetime as dt
+
 import numpy as np
 import polars as pl
 import pytest
@@ -6,6 +8,7 @@ from src.forecast import final_line_blend
 from src.talent2 import bootstrap_S
 from src.talent3 import (
     FLOOR_SD_PER_PA,
+    assert_causal,
     build_pa_frame,
     cutpoint_posterior,
     cutpoint_split,
@@ -153,3 +156,21 @@ def test_posterior_no_history_reduces_to_1d_shrinkage():
     rel = tau2 / (tau2 + S[0])
     assert abs(theta - (mu[0] + rel * (z[0] - mu[0]))) < 1e-10
     assert abs(V - rel * S[0]) < 1e-10
+
+
+def test_assert_causal_flags_future_rows():
+    cut = dt.date(2024, 6, 1)
+    ok = pl.DataFrame({"game_date":[dt.date(2024,5,1)], "season":[2024]})
+    assert_causal(ok, cut, 2024)                     # no raise
+    future = pl.DataFrame({"game_date":[dt.date(2024,7,1)], "season":[2024]})
+    try:
+        assert_causal(future, cut, 2024); raised = False
+    except AssertionError:
+        raised = True
+    assert raised
+    later_season = pl.DataFrame({"game_date":[dt.date(2023,5,1)], "season":[2025]})
+    try:
+        assert_causal(later_season, cut, 2024); raised = False
+    except AssertionError:
+        raised = True
+    assert raised
