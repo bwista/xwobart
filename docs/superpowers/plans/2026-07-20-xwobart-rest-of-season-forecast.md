@@ -828,7 +828,8 @@ Then `scripts/run_talent3.py` (structure — mirror `run_talent2.py`; full body 
   `μ`/`Σ` **once** (via `talent2.build_talent2_table` on full seasons, or read them from
   `results/talent2/talent2_metrics.json`), then for each (player, *k*) build the first-*k* peripheral
   measurement (`talent2.build_pa_measurements` + `assemble_measurements` restricted to the first-*k*
-  slice) and shrink with `talent2.mvn_posterior(z_firstk, S_firstk, μ, Σ)`. This is the 3-D
+  slice) and shrink with `talent2.mvn_posterior(z_firstk, S_firstk, μ, Σ, season_idx)` (pass the
+  current-season index — see the real signature at `talent2.py:179`). This is the 3-D
   single-season estimate from partial data — the G2 secondary bar. (If the peripheral bootstrap on
   thin *k* slices is fiddly, its 1-D fallback ≡ `league_shrunk`, which is already covered.)
 - `savant_to_date`: Savant's season xwOBA through the cutpoint = the pooled
