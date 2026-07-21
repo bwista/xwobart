@@ -513,3 +513,49 @@ between two *identical* v0 runs — it is too noisy to carry an argument either 
 - localization slopes (per ft/s) — grounder 0.0007, barrel -0.0023
 - sanity warnings: ['max R-hat on probed mu cells = 1.188 (> 1.1)']
 <!-- /stage_C_spray -->
+
+## Rest-of-season xwOBA forecast (rung a)
+
+A different product from everything above: not a season descriptor, but a **forecast** — stand
+at a mid-season cutpoint (a hitter's first *k* PAs) and predict his **final full-season xwOBA**,
+as a point plus a calibrated range. `θ_{i,t} = μ_t + η_i + u_{i,t}` adds one lever Phase 1 /
+Level 2 don't have: a **career random intercept `η_i`**, fit from the player's own completed
+prior seasons (closed-form Gaussian posterior, no MCMC, `src/talent3.py`, `scripts/run_talent3.py`,
+no BART re-fit, ~20 s). Rung (a): xwOBA-only, no aging, no peripherals — reuses `talent2`'s
+`bootstrap_S` for the measurement variance and the `player_ci` forward-bootstrap idea for the
+range. 7,493 forecasts over 1,945 unique (batter, season) pairs, seasons 2022–2025, cutpoints
+`k ∈ {50,100,150,200,300}`; causal leakage guard (`assert_causal`) passed on all 7,493 forecasts
+(4,674,004 conditioning rows checked).
+
+**Pooled RMSE of the final-line forecast, model vs. the five benchmarks:**
+
+| model | naive | league-shrunk | marcel | single-season L2 | savant-to-date |
+|---|---|---|---|---|---|
+| **0.02203** | 0.03438 | 0.02448 | 0.02270 | 0.02450 | 0.03438 |
+
+(naive and savant-to-date are numerically identical here — our per-PA values already are
+Savant's own `estimated_woba_using_speedangle`.)
+
+**Verdict: 4 of 5 gates pass.**
+
+| gate | result | detail |
+|---|---|---|
+| G1 beats naive, low PA-seen | **PASS** | `k≤100` (n=3,637): Δ **+0.01786**, CI95 [+0.01666, +0.01920] |
+| G2 beats/ties single-season L2 | **PASS (beat)** | n=7,493: Δ **+0.00246**, CI95 [+0.00169, +0.00335] — **CI excludes zero: the multi-year lever pays** |
+| G3 beats/ties Marcel | **PASS (beat)** | n=7,493: Δ **+0.00067**, CI95 [+0.00013, +0.00117] |
+| G4 calibration (±5pp) | **FAIL** | max \|coverage−level\| = **0.0727** |
+| G5 reduces to Phase 1 | **PASS** | max\|θ−xwoba_talent\| = **5.6e-17** over 2,636 rows |
+
+**Coverage by *k*-band** (50/80/90% central intervals):
+
+| level | k=50 | k=100 | k=150 | k=200 | k=300 |
+|---|---|---|---|---|---|
+| 0.50 | 0.495 | 0.486 | 0.479 | 0.470 | **0.427** |
+| 0.80 | 0.780 | 0.769 | 0.760 | 0.760 | 0.769 |
+| 0.90 | 0.875 | 0.872 | 0.868 | 0.859 | 0.869 |
+
+The 50%/80% intervals run narrow throughout (worst at high *k*, short remaining runway); the 90%
+band holds within ±5pp everywhere. G4 is reported as a real, unresolved failure — no gain in this
+section is quoted without its paired-bootstrap CI, and the calibration miss is not spun into a
+pass. See `results/talent3/NOTES.md` for the full construction, the gate panel, the fan-chart
+product shot (`results/talent3/figures/fan_chart_examples.png`), and the honest limitations list.
