@@ -86,10 +86,16 @@ error(r_final) = w · (r̂_rest − r_rest^actual).
 ### 4.1 Latent talent, across a player's seasons
 
 ```
-θ_{i,t}  =  μ  +  g(age_{i,t}; β)  +  η_i  +  u_{i,t}
+θ_{i,t}  =  μ_t  +  g(age_{i,t}; β)  +  η_i  +  u_{i,t}
 ```
 
-- **μ** — population mean per-PA xwOBA-value talent.
+- **μ_t** — the **per-season league environment** (per-PA xwOBA-value), **not** a global scalar.
+  League offense drifts materially year to year (Phase 1's per-season μ runs 0.305 → 0.318 across
+  2022–25, a ~0.013 swing — larger than the effects the model chases), so a global mean would
+  mis-center every forecast and specifically handicap it against the naive benchmark (which is
+  season-*t*-correct by construction — see G1). μ_t is estimated **causally from within-season
+  league xwOBA available at the cutpoint** (leaking nothing about the rest of season *t*), so it is
+  **not** a LOSO-fit hyperparameter (§4.3, §7); exact estimator deferred to §14.
 - **g(age; β)** — a shared aging curve (quadratic centered near the peak age, `β₂ < 0`; spline as
   a refinement). **Aging is a rung** — it needs external birthdates (§10), and is *additive*, so
   the base model runs without it.
@@ -101,7 +107,7 @@ error(r_final) = w · (r̂_rest − r_rest^actual).
   beyond the career mean.
 
 When a player has no prior seasons and aging is off, this reduces to a single measurement shrunk
-toward μ — i.e. **exactly Phase 1 / Level 2** (the basis of gate G5).
+toward μ_t — i.e. **exactly Phase 1 / Level 2** (the basis of gate G5).
 
 ### 4.2 Measurement (within-season, truncated)
 
@@ -118,8 +124,11 @@ z_{i,s}  =  θ_{i,s}  +  ε_{i,s},      ε_{i,s} ~ N(0, S_{i,s})
 
 `S_{i,s}` is the bootstrap sampling variance of the rate — `src/talent2.py:bootstrap_S`'s
 `S[0,0]`, floored at `FLOOR_SD_PER_PA²/n`. This is **reused verbatim**, run on the relevant PA
-subset. Structurally the model is a **linear mixed model with known, per-observation measurement
-error** (career random intercept + fixed aging + residual drift + heteroskedastic known noise).
+subset (the xwOBA-only base rung consumes only `S[0,0]`; `bootstrap_S` still takes `ev`/`barrel`
+arrays and returns a 3×3, so the base rung passes those as NaN — the `S[0,0]` branch runs
+independently, `talent2.py:100-102`). Structurally the model is a **linear mixed model with known,
+per-observation measurement error** (career random intercept + fixed aging + residual drift +
+heteroskedastic known noise).
 
 **Peripherals (rung b).** Extend the within-season measurement to the Level-2 joint MVN over
 (xwOBA, avg EV, barrel) so the peripheral-informed θ measurement feeds the hierarchy. The exact
@@ -129,12 +138,21 @@ base rung is xwOBA-only and is what establishes the multi-year lever.
 
 ### 4.3 Fitting — Empirical Bayes (primary)
 
-Everything is linear-Gaussian, so the marginal likelihood of a player's measurements
-`{z_{i,s}}` — integrating out `(η_i, {u_{i,s}})` — is Gaussian. Fit the hyperparameters
-`φ = (μ, β, σ_η², σ_u²[, ρ])` by maximizing the summed marginal log-likelihood over players
-(L-BFGS, in the style of `talent2.py:mvn_mle`). Full Bayes over `φ` (MCMC, propagating
-hyperparameter uncertainty into every interval) is a **stretch goal**, run on a subsample as a
-robustness check — not the primary path.
+Two kinds of parameter enter, and they are fit differently:
+
+- **Season environment `μ_t`** — estimated *causally* per season from within-season league
+  xwOBA available at the cutpoint (§4.1, §14), **not** by MLE and **not** held out. This keeps the
+  prior centered on the right offensive environment mid-season *t*, and is why LOSO (§7) applies
+  only to the structural parameters below (a per-season mean cannot be formed for a fully-held-out
+  season).
+- **Structural hyperparameters `φ = (β, σ_η², σ_u²[, ρ])`** — the aging curve and variance
+  components. Everything is linear-Gaussian, so the marginal likelihood of a player's measurements
+  `{z_{i,s}}` — integrating out `(η_i, {u_{i,s}})` with the `μ_t` offsets held fixed — is Gaussian.
+  Fit `φ` by maximizing the summed marginal log-likelihood over players (L-BFGS, in the style of
+  `talent2.py:mvn_mle`). These are population-structure parameters that barely drift season to
+  season, so they are the ones LOSO protects. Full Bayes over `φ` (MCMC, propagating hyperparameter
+  uncertainty into every interval) is a **stretch goal**, run on a subsample as a robustness
+  check — not the primary path.
 
 ### 4.4 Per-cutpoint posterior — closed form (the load-bearing trick)
 
@@ -166,7 +184,10 @@ the *m* remaining PAs. By simulation, for `b = 1..B`:
 Report empirical quantiles of `{r_final^(b)}` at 50/80/90%.
 
 **Future-sampling (step 2) — forward bootstrap (default).** Resample *m* (value, denom) pairs with
-replacement from a reference value distribution and recenter the rate to `θ^(b)`. The reference is
+replacement from a reference value distribution to form a rate, then **recenter by an additive
+shift** so the resampled-rate distribution has mean `θ^(b)` — an additive shift moves the location
+while preserving the shape (the boom/bust asymmetry we want; a multiplicative rescale would distort
+it). The reference is
 the player's own value multiset (career when available, else league-shaped by his profile for thin
 samples). This **preserves the natural asymmetry** (a boom/bust hitter has more upside room — the
 real "where could it go" signal, per `results/player_ci/NOTES.md`). **Analytic fallback:**
@@ -196,10 +217,13 @@ panel so we see where value enters.
   in the cache — acceptable for coarse cutpoints; ties broken stably).
 - **Report by two axes:** **PA-seen** *k* (how well talent is known) **and** *w* (how much runway
   remains). Both drive width; a single axis hides the structure.
-- **Hyperparameters — leave-one-season-out (primary):** to forecast season *t*, fit `φ` on the
-  other three full seasons. Removes the target season's own rows from the hyper-fit. **Strict
-  causal check:** refit with `φ` from seasons `< t` only, expect a small move (Level 2's analogous
-  convention cost ≈ 0.0005; `results/talent2/NOTES.md`).
+- **Season environment `μ_t` — causal, per season, not held out.** Estimated from within-season
+  league xwOBA at the cutpoint (§4.3, §14); available mid-season, leaks nothing. A per-season mean
+  cannot be formed for a fully-held-out season — which is exactly why LOSO applies only to `φ`.
+- **Structural hyperparameters `φ` — leave-one-season-out (primary):** to forecast season *t*, fit
+  `φ = (β, σ_η², σ_u²[, ρ])` on the other three full seasons. **Strict causal check:** refit `φ`
+  from seasons `< t` only; expect a small move (Level 2's analogous convention cost ≈ 0.0005;
+  `results/talent2/NOTES.md`).
 - **Truth.** The player's *actual* rest-of-season rate → actual `r_final`. Never seen by the model.
 
 ## 8. Benchmarks (the bar)
@@ -222,8 +246,11 @@ bootstrap** over players:
 - **G3 — beats/ties Marcel.** *The machinery earns its keep over the simple projection.*
 - **G4 — calibration** of the 50/80/90 intervals within ±5pp, across PA-seen and *w* bands; report
   sharpness (mean width) at fixed coverage.
-- **G5 — reduces to Level 2** when history is removed (strip η_i / prior seasons): estimates match
-  `results/talent2` to tolerance. *Free regression/sanity test.*
+- **G5 — reduces to Level 2** when history is removed (strip η_i / prior seasons) **and evaluated at
+  the full-season cutpoint with `μ_t` taken as Level 2's per-season league mean**: estimates match
+  `results/talent2` to tolerance. Because Level 2 shrinks toward a *per-season* μ_t, this test is
+  only well-defined with the per-season environment of §4.1/§4.3 — a global μ would fail it
+  spuriously, and the tolerance would silently absorb the gap. *Free regression/sanity test.*
 
 Report **pooled RMSE + a by-band table**, never per-band correlation alone (affine-invariance;
 `results/talent/NOTES.md`). Direction-of-improvement claims carry their paired-bootstrap CI.
@@ -285,6 +312,11 @@ remains an independent surface side-quest, unrelated here.
 
 ## 14. Open details deferred to implementation planning
 
+- **Exact causal `μ_t` estimator** (§4.1): league xwOBA over all PAs through the cutpoint's calendar
+  date (`game_date`) vs. the league mean over all players' first-*k* PAs. Within-season league drift
+  is small, so either is defensible; pick one and state it. Note: for the **G5 regression test only**
+  (§9), `μ_t` is instead Level 2's full-season per-season league mean, so the reduced model matches
+  `talent2` exactly.
 - Rung (b) peripheral composition without double-shrinkage (§4.2).
 - Exact aging-curve parameterization and the birthdate source (rung c).
 - Forward-bootstrap reference distribution for thin samples (career vs league-shaped) (§5).
