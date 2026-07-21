@@ -5,11 +5,13 @@ no aging. Reuses talent2's bootstrap_S for the measurement variance. Pure functi
 orchestration in scripts/run_talent3.py."""
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import polars as pl
+from scipy.optimize import minimize
 
 from src.talent2 import FLOOR_SD_PER_PA, bootstrap_S
-from scipy.optimize import minimize
 
 
 def build_pa_frame(pitches: pl.DataFrame) -> pl.DataFrame:
@@ -35,6 +37,7 @@ def cutpoint_split(pas: pl.DataFrame, k: int, min_remaining: float) -> dict | No
     (remaining). Returns a dict with r_obs/D_obs, r_rest/D_rest (realized), w, and
     the raw observed/remaining value+denom arrays. None if fewer than k+1 PAs or the
     remaining denom < min_remaining (no real 'rest of season')."""
+    assert k >= 0, "k must be non-negative"
     o = pas.sort("game_date", maintain_order=True)   # stable: ties keep input order
     n = o.height
     if n <= k:
@@ -43,7 +46,7 @@ def cutpoint_split(pas: pl.DataFrame, k: int, min_remaining: float) -> dict | No
     v_obs, d_obs = v[:k], d[:k]
     v_rest, d_rest = v[k:], d[k:]
     D_obs, D_rest = float(d_obs.sum()), float(d_rest.sum())
-    if D_rest < min_remaining or D_obs <= 0:
+    if D_rest <= 0 or D_rest < min_remaining or D_obs <= 0:
         return None
     return {
         "r_obs": float(v_obs.sum() / D_obs), "D_obs": D_obs,
@@ -89,13 +92,15 @@ def fit_hypers_eb(y: np.ndarray, S: np.ndarray, player_idx: np.ndarray
         for g in groups:
             yi, Si = y[g], S[g]
             Sig = se2 * np.ones((len(g), len(g))) + np.diag(su2 + Si)
-            sign, logdet = np.linalg.slogdet(Sig)
+            _, logdet = np.linalg.slogdet(Sig)
             sol = np.linalg.solve(Sig, yi)
             total += 0.5 * (logdet + yi @ sol)
         return float(total)
 
     res = minimize(nll, np.log([0.02 ** 2, 0.01 ** 2]),
                    method="L-BFGS-B", options={"maxiter": 200})
+    if not res.success:
+        warnings.warn(f"fit_hypers_eb did not converge: {res.message}")
     se2, su2 = np.exp(res.x)
     return float(se2), float(su2)
 
@@ -106,6 +111,7 @@ def cutpoint_posterior(z: np.ndarray, mu: np.ndarray, S: np.ndarray,
     """Posterior (theta_hat, V) of theta_{i,t}=mu_t+eta+u_t given demeaned
     measurements y=z-mu with per-obs variance S. Latent x=(eta, u_1..u_J); the
     current season's u is the last component. Closed-form Gaussian conditioning."""
+    assert int(np.asarray(is_current).sum()) == 1, "is_current must mark exactly one season"
     J = len(z)
     P = np.diag(np.concatenate([[se2], np.full(J, su2)]))      # (J+1, J+1)
     H = np.zeros((J, J + 1))

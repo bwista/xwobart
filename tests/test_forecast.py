@@ -1,5 +1,5 @@
 import numpy as np
-from src.forecast import final_line_blend
+from src.forecast import final_line_blend, forward_forecast
 
 
 def test_blend_equals_direct_full_season_rate():
@@ -22,7 +22,9 @@ def test_blend_w_zero_returns_locked_in():
     assert w == 0.0 and abs(blend - 0.333) < 1e-12
 
 
-from src.forecast import forward_forecast
+def test_blend_w_zero_ignores_nonfinite_r_rest():
+    blend, w = final_line_blend(0.5, 1.0, float("inf"), 0.0)
+    assert w == 0.0 and blend == 0.5   # 0*inf must NOT become nan
 
 
 def test_forward_forecast_nominal_coverage_on_synthetic():

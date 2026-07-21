@@ -1,6 +1,18 @@
 import numpy as np
 import polars as pl
-from src.talent3 import build_pa_frame, cutpoint_split
+import pytest
+
+from src.forecast import final_line_blend
+from src.talent2 import bootstrap_S
+from src.talent3 import (
+    FLOOR_SD_PER_PA,
+    build_pa_frame,
+    cutpoint_posterior,
+    cutpoint_split,
+    fit_hypers_eb,
+    sample_measurement,
+    season_mu_causal,
+)
 
 
 def _pitches():
@@ -34,7 +46,6 @@ def test_cutpoint_split_orders_and_blends():
     assert abs(cp["r_rest"] - 0.0) < 1e-12 and cp["D_rest"] == 1
     assert abs(cp["w"] - 0.5) < 1e-12
     # blend identity holds against the whole-season rate
-    from src.forecast import final_line_blend
     r_final, _ = final_line_blend(cp["r_obs"], cp["D_obs"], cp["r_rest"], cp["D_rest"])
     assert abs(r_final - (0.8 + 0.0) / 2) < 1e-12
 
@@ -45,21 +56,34 @@ def test_cutpoint_split_ineligible_when_no_runway():
     assert cutpoint_split(f, k=2, min_remaining=1) is None   # nothing remaining
 
 
+def test_cutpoint_split_rejects_negative_k():
+    f = build_pa_frame(_pitches()).filter(pl.col("batter") == 2)
+    with pytest.raises(AssertionError):
+        cutpoint_split(f, k=-1, min_remaining=1)
+
+
+def test_cutpoint_split_none_when_remaining_denom_zero():
+    # remaining PA has denom 0 -> D_rest == 0; even with min_remaining=0 there is no rest
+    frame = pl.DataFrame({
+        "batter": [7, 7], "season": [2024, 2024],
+        "game_date": pl.Series(["2024-04-01", "2024-04-02"]).str.to_date(),
+        "value": [0.5, 0.0], "denom": [1.0, 0.0],
+    })
+    assert cutpoint_split(frame, k=1, min_remaining=0) is None
+
+
 def test_sample_measurement_matches_bootstrap_S_diag():
-    from src.talent3 import sample_measurement, FLOOR_SD_PER_PA
     rng = np.random.default_rng(0)
     v = np.array([1.2, 0.1, 0.69, 0.0, 2.0, 0.0]); d = np.ones_like(v)
     z, s00 = sample_measurement(v, d, B=500, rng=rng)
     assert abs(z - v.sum() / d.sum()) < 1e-12
     # equals bootstrap_S[0,0] under the same seed
-    from src.talent2 import bootstrap_S
     nan = np.full_like(v, np.nan)
     S = bootstrap_S(v, d, nan, nan, B=500, rng=np.random.default_rng(0))
     assert abs(s00 - S[0, 0]) < 1e-12
 
 
 def test_sample_measurement_floor_binds_on_degenerate_sample():
-    from src.talent3 import sample_measurement, FLOOR_SD_PER_PA
     rng = np.random.default_rng(1)
     v = np.array([0.0, 0.0]); d = np.array([1.0, 1.0])   # zero variation
     _, s00 = sample_measurement(v, d, B=200, rng=rng)
@@ -67,7 +91,6 @@ def test_sample_measurement_floor_binds_on_degenerate_sample():
 
 
 def test_season_mu_causal_uses_only_first_k():
-    from src.talent3 import season_mu_causal
     # Two players, 2024. With k=1, only each player's earliest PA counts.
     f = build_pa_frame(_pitches()).filter(pl.col("season") == 2024)
     # player1 earliest (04-01) value .1 ; player2 earliest (04-01) value .8
@@ -77,9 +100,6 @@ def test_season_mu_causal_uses_only_first_k():
     mu_full = season_mu_causal(f, season=2024, k=10_000)
     all_v = f["value"].to_numpy(); all_d = f["denom"].to_numpy()
     assert abs(mu_full - all_v.sum() / all_d.sum()) < 1e-12
-
-
-from src.talent3 import fit_hypers_eb
 
 
 def test_fit_hypers_recovers_known_variances():
@@ -99,9 +119,6 @@ def test_fit_hypers_recovers_known_variances():
     assert abs(np.sqrt(est_u2) - sig_u) < 0.006
 
 
-from src.talent3 import cutpoint_posterior
-
-
 def test_posterior_matches_brute_force_gaussian():
     se2, su2 = 0.030 ** 2, 0.015 ** 2
     # prior seasons: two measurements; current: one truncated measurement
@@ -119,6 +136,13 @@ def test_posterior_matches_brute_force_gaussian():
     sel = np.array([1,0,0,1], float)   # eta + u_t
     assert abs(theta - (mus[-1] + sel @ xhat)) < 1e-10
     assert abs(V - sel @ Vx @ sel) < 1e-10
+
+def test_posterior_requires_exactly_one_current():
+    se2, su2 = 0.03 ** 2, 0.015 ** 2
+    z = np.array([0.34, 0.33]); mu = np.array([0.315, 0.318]); S = np.array([0.02**2, 0.02**2])
+    with pytest.raises(AssertionError):
+        cutpoint_posterior(z, mu, S, np.array([True, True]), se2, su2)
+
 
 def test_posterior_no_history_reduces_to_1d_shrinkage():
     # single current measurement, no prior seasons → Phase-1/L2 1-D shrink toward mu_t

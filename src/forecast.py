@@ -16,6 +16,8 @@ def final_line_blend(r_obs: float, D_obs: float, r_rest: float, D_rest: float
     rest-of-season rate. Returns (r_final, w) with w = D_rest / (D_obs + D_rest)."""
     total = D_obs + D_rest
     w = 0.0 if total == 0 else D_rest / total
+    if w == 0.0:                       # no rest-of-season weight: locked in; don't touch r_rest
+        return r_obs, 0.0
     return (1.0 - w) * r_obs + w * r_rest, w
 
 
@@ -31,23 +33,26 @@ def forward_forecast(theta_hat: float, V: float, r_obs: float, w: float,
         return {"center": base, **{k: base for k in _level_keys(levels)}}
     thetas = rng.normal(theta_hat, np.sqrt(max(V, 0.0)), size=B)
     ref_mean = ref_v.sum() / ref_d.sum()
-    finals = np.empty(B)
-    for b in range(B):
-        idx = rng.integers(0, len(ref_v), size=m)
-        rate = ref_v[idx].sum() / ref_d[idx].sum()
-        r_rest = rate + (thetas[b] - ref_mean)         # additive shift -> mean theta_b
-        finals[b] = (1.0 - w) * r_obs + w * r_rest
+    idx = rng.integers(0, len(ref_v), size=(B, m))
+    rate = ref_v[idx].sum(axis=1) / ref_d[idx].sum(axis=1)
+    r_rest = rate + (thetas - ref_mean)              # additive shift -> mean theta_b (per draw)
+    finals = (1.0 - w) * r_obs + w * r_rest
     out = {"center": float(np.median(finals))}
     for lv in levels:
         lo, hi = (1 - lv) / 2, 1 - (1 - lv) / 2
-        out[f"q{round(lo*100):02d}"] = float(np.quantile(finals, lo))
-        out[f"q{round(hi*100):02d}"] = float(np.quantile(finals, hi))
+        out[_key(lo)] = float(np.quantile(finals, lo))
+        out[_key(hi)] = float(np.quantile(finals, hi))
     return out
+
+
+def _key(p: float) -> str:
+    """Quantile key like 'q05'. round() (not int()) guards float-repr, e.g. 0.05*100 -> 4.999."""
+    return f"q{round(p * 100):02d}"
 
 
 def _level_keys(levels):
     keys = []
     for lv in levels:
         lo = (1 - lv) / 2
-        keys += [f"q{round(lo*100):02d}", f"q{round((1-lo)*100):02d}"]
+        keys += [_key(lo), _key(1 - lo)]
     return keys

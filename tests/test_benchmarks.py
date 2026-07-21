@@ -1,4 +1,3 @@
-import numpy as np
 from src.benchmarks import naive, marcel, league_shrunk
 
 def test_naive_is_observed_rate():
@@ -19,8 +18,15 @@ def test_marcel_weights_and_regression():
                  cur_rate=0.360, cur_denom=100.0, mu=0.315,
                  regress_pa=200.0, weights=(5, 4, 3))
     # manual: recency weight prior=5*400, current gets weight 5*100? -> see impl doc
-    assert 0.315 < est < 0.360           # between league and current, sensible
+    assert abs(est - 787 / 2300) < 1e-9    # exact: catches weight-index off-by-one
     # regression pulls toward mu: with regress_pa large, est -> mu
     est_heavy = marcel([0.340], [400.0], 0.360, 100.0, 0.315,
                        regress_pa=100_000.0)
     assert abs(est_heavy - 0.315) < 0.01
+
+
+def test_marcel_no_prior_seasons():
+    # rookie: only current-to-date + league regression
+    est = marcel(prior_rates=[], prior_denoms=[], cur_rate=0.360, cur_denom=100.0,
+                 mu=0.315, regress_pa=200.0, weights=(5, 4, 3))
+    assert abs(est - (0.360 * 100 * 5 + 0.315 * 200) / (100 * 5 + 200)) < 1e-9
