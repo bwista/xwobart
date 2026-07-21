@@ -4,19 +4,28 @@ Interactive walk-through of everything accomplished so far. Each notebook **load
 already-computed artifacts** in `results/` and displays the saved figures — nothing here
 re-fits a model or recomputes heavy results, so they run in seconds.
 
+The notebooks are committed **with their outputs embedded**, so every table and figure is
+viewable on GitHub or in any notebook viewer straight from a clone — no kernel, no re-run,
+no model artifacts needed. Re-running is only for regenerating those outputs.
+
 ## How to run
 
-Jupyter is **not** in the project `.venv` yet. Install it, then launch with the venv kernel:
+Any Python environment with a Jupyter kernel and `polars` works (the heavy model traces are
+not needed — everything reads the committed JSON/parquet artifacts in `results/`):
 
 ```bash
-cd /Users/jweinga/Documents/python/xwobart
-.venv/bin/python -m pip install jupyterlab      # or: notebook / ipykernel for VS Code / Cursor
-.venv/bin/python -m jupyterlab notebooks/       # opens in the browser
+python -m pip install jupyterlab polars   # or just ipykernel for VS Code / Cursor
+python -m jupyterlab notebooks/           # opens in the browser
 ```
 
-In VS Code / Cursor, just open a notebook and pick the `.venv` interpreter as the kernel.
-Run the first cell (setup) first — it finds the repo root automatically, so it works whether
-you launch from the repo root or from `notebooks/`.
+Run the first cell (setup) first — it finds the repo root automatically and imports the
+shared helpers from `notebooks/nb_helpers.py` (`jload`, `show_fig`, the polars display
+defaults), so it works whether you launch from the repo root or from `notebooks/`.
+
+Each notebook ends with a small **guard cell** asserting that the headline numbers quoted
+in the prose still match the artifacts under `results/` — if a pipeline re-run changes a
+result, re-executing the notebook fails loudly at the guard instead of letting the text
+silently drift.
 
 ## The notebooks (read in order)
 
