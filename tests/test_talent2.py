@@ -114,6 +114,33 @@ def test_bootstrap_S_floor_on_degenerate_values():
     assert S[0, 0] >= FLOOR_SD_PER_PA ** 2 / n
 
 
+def test_bootstrap_S_3channel_unchanged():
+    # BIT-IDENTITY guard: baseline captured from the pre-change bootstrap_S on
+    # this exact fixture (B=400, seed 0) via a one-off script. pull=None must
+    # reproduce it exactly -- proves the k-channel generalization doesn't
+    # perturb the RNG draw or the 3-channel arithmetic at all.
+    v = np.array([0.5, 1.2, 0.0, 2.0, 0.3]); d = np.ones(5)
+    ev = np.array([90., 101., 88., 104., np.nan]); br = np.array([0., 1., 0., 1., np.nan])
+    S = bootstrap_S(v, d, ev, br, B=400, rng=np.random.default_rng(0))
+    S_baseline = np.array([
+        [0.11355162907268171, 1.1190691938178783, 0.07629323308270675],
+        [1.1190691938178783, 13.963786255569477, 0.9978526176552491],
+        [0.07629323308270675, 0.9978526176552491, 0.07358535226956278],
+    ])
+    assert S.shape == (3, 3)
+    assert np.array_equal(S, S_baseline)           # bit-identical, not just finite
+
+
+def test_bootstrap_S_4channel_pull():
+    v = np.array([0.5, 1.2, 0.0, 2.0, 0.3]); d = np.ones(5)
+    ev = np.array([90., 101., 88., 104., np.nan]); br = np.array([0., 1., 0., 1., np.nan])
+    pull = np.array([-5., 18., 2., 22., np.nan])
+    S = bootstrap_S(v, d, ev, br, B=400, rng=np.random.default_rng(0), pull=pull)
+    assert S.shape == (4, 4)
+    w = np.linalg.eigvalsh(S)
+    assert (w >= -1e-9).all()          # PSD
+
+
 def test_assemble_measurements_aligns_and_flags():
     rng = _rng()
     rows = []
