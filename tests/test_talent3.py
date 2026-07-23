@@ -29,12 +29,24 @@ def _pitches():
         "estimated_woba_using_speedangle": [1.2, 0.1, None, 0.8, None, None],
         "woba_value": [1.25, 0.0, 0.69, 0.9, 0.0, 0.0],
         "woba_denom": [1, 1, 1, 1, 1, None],   # last row: non-PA, dropped
+        # rung-b peripherals: stand is per-pitch and always present (real Statcast
+        # rows always carry it); hc_x/hc_y/launch_speed/launch_angle/launch_speed_angle
+        # are only populated on the BBE ("X") rows, exactly like real Statcast data.
+        # _spray_cols runs on the full frame before any PA filtering, so every row
+        # -- including the dropped non-PA row -- needs a non-null stand.
+        "stand":              ["R", "R", "R", "L", "L", "R"],
+        "hc_x":               [90.0, 160.0, None, 100.0, None, None],
+        "hc_y":               [150.0, 150.0, None, 140.0, None, None],
+        "launch_speed":       [98.0, 90.0, None, 105.0, None, None],
+        "launch_angle":       [15.0, 20.0, None, 27.0, None, None],
+        "launch_speed_angle": [5, 3, None, 6, None, None],
     })
 
 
 def test_build_pa_frame_keeps_date_and_value_logic():
     f = build_pa_frame(_pitches())
-    assert set(f.columns) == {"batter", "season", "game_date", "value", "denom"}
+    assert set(f.columns) == {"batter", "season", "game_date", "value", "denom",
+                              "ev", "barrel", "pull"}
     assert f.height == 5                              # non-PA row dropped
     p1 = f.filter(pl.col("batter") == 1).sort("value")
     assert p1["value"].to_list() == [0.1, 0.69, 1.2]  # BBE→est_woba, walk→woba_value
@@ -168,6 +180,36 @@ def test_coverage_by_band_counts_hits():
     cov = coverage_by_band(tbl, "band", 0.90)     # share within [q05,q95] per band
     assert cov["50"] == 0.5      # .30 in, .40 out
     assert cov["100"] == 1.0     # both in
+
+
+def test_build_pa_frame_carries_peripherals():
+    # two BBE (type X) + one non-BBE (walk). pull comes from _spray_cols(hc_x,hc_y,stand).
+    # NOTE: launch_angle is added here (not in the original task spec's fixture) because
+    # _spray_cols computes _la_bin from it unconditionally -- omitting it raises polars
+    # ColumnNotFoundError, it's not just a null-handling edge.
+    pitches = pl.DataFrame({
+        "batter": [1, 1, 1], "game_year": [2024, 2024, 2024],
+        "game_date": ["2024-04-01", "2024-04-02", "2024-04-03"],
+        "type": ["X", "X", None], "events": ["single", "home_run", "walk"],
+        "description": ["hit_into_play", "hit_into_play", "walk"],
+        "launch_speed": [95.0, 104.0, None],
+        "launch_angle": [12.0, 28.0, None],
+        "launch_speed_angle": [4, 6, None],       # barrel = (==6)
+        "estimated_woba_using_speedangle": [0.9, 2.0, None],
+        "woba_value": [0.9, 2.0, 0.7], "woba_denom": [1, 1, 1],
+        "hc_x": [100.0, 130.0, None], "hc_y": [100.0, 90.0, None],
+        "stand": ["R", "R", "R"],
+    })
+    out = build_pa_frame(pitches).sort("game_date")
+    assert out.columns[:5] == ["batter", "season", "game_date", "value", "denom"]
+    assert set(["ev", "barrel", "pull"]).issubset(out.columns)
+    ev = out["ev"].to_list()
+    assert ev[0] == 95.0 and ev[1] == 104.0 and ev[2] is None        # non-BBE -> null
+    assert out["barrel"].to_list() == [0.0, 1.0, None]
+    pull = out["pull"].to_list()
+    assert pull[0] is not None and pull[1] is not None and pull[2] is None
+    # _spray_cols sign: hc_x=100 is left-of-home (pulled,+) for RHB, hc_x=130 is oppo (−);
+    # test only checks non-null, so sign convention isn't asserted here
 
 
 def test_assert_causal_flags_future_rows():

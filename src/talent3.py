@@ -11,24 +11,37 @@ import numpy as np
 import polars as pl
 from scipy.optimize import minimize
 
+from src.prep import _spray_cols
 from src.talent2 import FLOOR_SD_PER_PA, bootstrap_S
 
 
 def build_pa_frame(pitches: pl.DataFrame) -> pl.DataFrame:
-    """One row per PA with (batter, season, game_date, value, denom). value/denom
-    exactly as talent2.build_pa_measurements; game_date is parsed to pl.Date so
-    PAs can be ordered within a season for cutpoints."""
+    """One row per PA with (batter, season, game_date, value, denom, ev, barrel,
+    pull). value/denom exactly as talent2.build_pa_measurements; game_date is
+    parsed to pl.Date so PAs can be ordered within a season for cutpoints.
+    ev/barrel mirror talent2.build_pa_measurements exactly (tracked BBE only,
+    null elsewhere). pull is spray_obs from src.prep._spray_cols -- the raw
+    observed, handedness-mirrored pull angle (NOT spray_pull, which is the
+    surface-imputed feature add_spray builds later from lookup tables we don't
+    want here); null on untracked BBE and on the ~0.04% of tracked BBE with
+    missing hc_x/hc_y, which bootstrap_S handles NaN-aware downstream."""
+    tracked = ((pl.col("type") == "X") & pl.col("launch_speed").is_not_null()
+               & pl.col("launch_speed_angle").is_not_null())
+    p = _spray_cols(pitches)        # adds spray_obs (signed pull angle, handedness-mirrored)
     return (
-        pitches.filter(pl.col("woba_denom").is_not_null())
+        p.filter(pl.col("woba_denom").is_not_null())
         .with_columns(
             value=pl.when(pl.col("type") == "X")
             .then(pl.coalesce("estimated_woba_using_speedangle", "woba_value"))
             .otherwise(pl.col("woba_value")),
             game_date=pl.col("game_date").cast(pl.Utf8).str.slice(0, 10)
             .str.to_date("%Y-%m-%d"),
+            ev=pl.when(tracked).then(pl.col("launch_speed")),
+            barrel=pl.when(tracked).then((pl.col("launch_speed_angle") == 6).cast(pl.Float64)),
+            pull=pl.when(tracked).then(pl.col("spray_obs")),
         )
         .select("batter", season="game_year", game_date="game_date",
-                value="value", denom="woba_denom")
+                value="value", denom="woba_denom", ev="ev", barrel="barrel", pull="pull")
     )
 
 
