@@ -18,6 +18,7 @@ leakage_digest.json and figures/*.png. Run from repo root:
 `.venv/bin/python scripts/run_talent3.py`."""
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -35,6 +36,7 @@ import polars as pl
 from src.benchmarks import league_shrunk, marcel
 from src.config import load_config
 from src.forecast import final_line_blend, forward_forecast
+from src.precheck import pull_incremental_signal
 from src.talent import eb_fit
 from src.talent3 import (
     assert_causal,
@@ -56,6 +58,101 @@ B_FWD = 600                            # forward-bootstrap reps for the predicti
 FIT_MIN_PA = 100                       # min full-season denom to enter a hyper/tau fit
 # intentionally mirrors cfg.min_pa (config evaluate.min_pa): the fit floor matching
 # Phase-1/Level-2.
+
+# ---------------------------------------------------------------------------
+# Task 3: pre-check (§5 go/no-go) -- does early pull tendency add rest-of-season
+# signal beyond early xwOBA/EV/barrel? Pure closed-form OLS, no BART.
+# ---------------------------------------------------------------------------
+GO_THRESHOLD = 0.01   # delta_r2 bar at the lowest k-band; mirrors test_precheck's
+                       # own "matters" bar (test_precheck.py: pull_matters > 0.01,
+                       # pull_irrelevant < 0.005) so the go/no-go line is the same
+                       # one the unit test already calibrates against real signal.
+
+
+def _precheck_band_features(groups: dict, players: dict, seasons: list[int], k: int
+                            ) -> tuple[dict, np.ndarray]:
+    """Assemble one k-band's (early features, rest-of-season target) arrays, pooled
+    over every eligible (batter, season) at this k. Reuses cutpoint_split for
+    eligibility exactly as run_sweep does. LEAKAGE DISCIPLINE: early features come
+    ONLY from `.head(k)` of the game_date-sorted player-season frame (the same PAs
+    cutpoint_split's own r_obs is computed from) -- never from the rest; the target
+    is cutpoint_split's realized r_rest. ev/barrel/pull are meaned over the first-k
+    PAs' tracked-BBE rows (polars .mean() ignores nulls and returns null when every
+    row is null, e.g. a walk-only start -- converted to NaN here so
+    pull_incremental_signal's own NaN-row drop handles it, exactly like a player
+    with zero tracked BBE in his first k PAs)."""
+    xwoba, ev, barrel, pull, y = [], [], [], [], []
+    for t in seasons:
+        for i in players[t]:
+            cp = cutpoint_split(groups[(i, t)], k, MIN_REMAINING)
+            if cp is None:
+                continue
+            early = groups[(i, t)].sort("game_date", maintain_order=True).head(k)
+            ev_m, barrel_m, pull_m = early["ev"].mean(), early["barrel"].mean(), early["pull"].mean()
+            xwoba.append(cp["r_obs"])
+            ev.append(np.nan if ev_m is None else ev_m)
+            barrel.append(np.nan if barrel_m is None else barrel_m)
+            pull.append(np.nan if pull_m is None else pull_m)
+            y.append(cp["r_rest"])
+    X = {"xwoba": np.array(xwoba), "ev": np.array(ev),
+         "barrel": np.array(barrel), "pull": np.array(pull)}
+    return X, np.array(y)
+
+
+def run_precheck(cfg) -> dict:
+    """Task 3 go/no-go: does early-season pull tendency predict rest-of-season
+    xwOBA BEYOND early xwOBA/EV/barrel-rate? Answers this BEFORE any BART model
+    gets built -- if delta_r2 is trivial at low k, spray is redundant for
+    forecasting and the rest of rung b should stop. Closed-form OLS per
+    pull_incremental_signal, one call per PA-seen (k) band (pooled across all
+    seasons at that k, same CUTPOINTS/MIN_REMAINING/eligibility as run_sweep).
+    Writes results/talent3/precheck_pull.json; does not touch the full sweep."""
+    seasons = sorted(cfg.all_seasons)
+    print("building PA frame from slim Statcast caches (precheck)...")
+    f = build_pa_frame(load_pitches(cfg, seasons))
+    print(f"  {f.height:,} PAs over seasons {seasons}")
+    groups = f.partition_by(["batter", "season"], as_dict=True)
+    players = {t: sorted(b for (b, s) in groups if s == t) for t in seasons}
+    print(f"  {len(groups):,} player-seasons")
+
+    print("\npull incremental-signal pre-check, by PA-seen (k) band:")
+    header = f"  {'k':>5} {'n':>7} {'r2_base':>9} {'r2_full':>9} {'delta_r2':>10} {'partial_r':>10}"
+    print(header)
+    by_k = {}
+    for k in CUTPOINTS:
+        X, y = _precheck_band_features(groups, players, seasons, k)
+        res = pull_incremental_signal(X, y)
+        by_k[k] = res
+        print(f"  {k:>5} {res['n']:>7} {res['r2_base']:>9.5f} {res['r2_full']:>9.5f} "
+              f"{res['delta_r2']:>+10.5f} {res['pull_partial_corr']:>+10.4f}")
+
+    low_k = min(CUTPOINTS)
+    low_delta = by_k[low_k]["delta_r2"]
+    go = low_delta >= GO_THRESHOLD
+    verdict = "GO" if go else "STOP"
+    print(f"\n  VERDICT: {verdict} -- delta_r2 at k={low_k} (lowest PA-seen band) is "
+          f"{low_delta:+.5f} vs GO_THRESHOLD={GO_THRESHOLD} "
+          f"({'>=' if go else '<'} threshold)")
+    if go:
+        print("  early pull tendency adds non-trivial rest-of-season signal beyond "
+              "xwOBA/EV/barrel -- proceed with rung b.")
+    else:
+        print("  early pull tendency adds no material rest-of-season signal beyond "
+              "xwOBA/EV/barrel at low k -- spray looks redundant for forecasting; "
+              "do not proceed with rung b on this basis alone.")
+
+    outdir = cfg.results_dir / "talent3"
+    outdir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "by_k": {str(k): by_k[k] for k in CUTPOINTS},
+        "low_k": low_k,
+        "go_threshold": GO_THRESHOLD,
+        "verdict": verdict,
+    }
+    (outdir / "precheck_pull.json").write_text(json.dumps(payload, indent=2))
+    print(f"  wrote {outdir}/precheck_pull.json")
+    return payload
+
 
 # ---------------------------------------------------------------------------
 # Task 10: gate scoring + metrics
@@ -651,7 +748,19 @@ def fig_rmse_vs_benchmarks(figdir: Path, metrics: dict) -> None:
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--precheck", action="store_true",
+                    help="Task 3 go/no-go only: does early pull tendency add "
+                         "rest-of-season signal beyond xwOBA/EV/barrel? Closed-form, "
+                         "no BART. Writes results/talent3/precheck_pull.json and "
+                         "exits without running the full sweep/scoring/figures.")
+    args = ap.parse_args()
     cfg = load_config()
+
+    if args.precheck:
+        run_precheck(cfg)
+        return
+
     seasons = sorted(cfg.all_seasons)
     print("building PA frame from slim Statcast caches...")
     f = build_pa_frame(load_pitches(cfg, seasons))
