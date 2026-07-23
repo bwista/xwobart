@@ -24,7 +24,10 @@ def build_pa_frame(pitches: pl.DataFrame) -> pl.DataFrame:
     observed, handedness-mirrored pull angle (NOT spray_pull, which is the
     surface-imputed feature add_spray builds later from lookup tables we don't
     want here); null on untracked BBE and on the ~0.04% of tracked BBE with
-    missing hc_x/hc_y, which bootstrap_S handles NaN-aware downstream."""
+    missing hc_x/hc_y, which bootstrap_S handles NaN-aware downstream.
+
+    Requires (inherited from _spray_cols, which runs on the full pre-filter frame):
+    stand non-null on every input row, and hc_x/hc_y/launch_angle present."""
     tracked = ((pl.col("type") == "X") & pl.col("launch_speed").is_not_null()
                & pl.col("launch_speed_angle").is_not_null())
     p = _spray_cols(pitches)        # adds spray_obs (signed pull angle, handedness-mirrored)

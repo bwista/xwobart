@@ -207,9 +207,10 @@ def test_build_pa_frame_carries_peripherals():
     assert ev[0] == 95.0 and ev[1] == 104.0 and ev[2] is None        # non-BBE -> null
     assert out["barrel"].to_list() == [0.0, 1.0, None]
     pull = out["pull"].to_list()
-    assert pull[0] is not None and pull[1] is not None and pull[2] is None
-    # _spray_cols sign: hc_x=100 is left-of-home (pulled,+) for RHB, hc_x=130 is oppo (−);
-    # test only checks non-null, so sign convention isn't asserted here
+    assert pull[2] is None                              # non-BBE -> null
+    # pull is spray_obs (handedness-mirrored): hc_x=100 is left-of-home -> pulled -> + for a RHB,
+    # hc_x=130 is right-of-home -> oppo -> -. Pins pull=spray_obs, not phi_raw or spray_pull.
+    assert pull[0] > 0 and pull[1] < 0
 
 
 def test_assert_causal_flags_future_rows():
