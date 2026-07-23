@@ -139,6 +139,12 @@ def test_bootstrap_S_4channel_pull():
     assert S.shape == (4, 4)
     w = np.linalg.eigvalsh(S)
     assert (w >= -1e-9).all()          # PSD
+    # pull is an ADDITIVE channel: the other three are undisturbed. NOT bit-exact --
+    # np.cov's BLAS accumulation differs ~1 ULP across 3-row vs 4-row input.
+    S3 = bootstrap_S(v, d, ev, br, B=400, rng=np.random.default_rng(0))
+    assert np.allclose(S[:3, :3], S3, atol=1e-12)
+    assert S[3, 3] >= 1e-8             # 4th (pull) diagonal got floored by range(1, D)
+    assert np.array_equal(S, S.T)      # symmetric
 
 
 def test_assemble_measurements_aligns_and_flags():
