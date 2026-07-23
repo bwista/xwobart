@@ -1,0 +1,16 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-23-forecast-rungb-spray.md",
+  "tasks": [
+    {"id": 1, "subject": "Task 1: Carry EV/barrel/pull per PA in build_pa_frame", "status": "pending"},
+    {"id": 2, "subject": "Task 2: Generalize bootstrap_S with pull channel (3-channel unchanged)", "status": "pending", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Pull incremental-signal pre-check (§5 go/no-go)", "status": "pending", "blockedBy": [1]},
+    {"id": 4, "subject": "Task 4: peripheral_measurement conditional-prior (z',S') (spec §4.2)", "status": "pending"},
+    {"id": 5, "subject": "Task 5: Fit population Sigma + peripheral means (k-channel mvn_mle)", "status": "pending", "blockedBy": [2]},
+    {"id": 6, "subject": "Task 6: Wire rung-b measurement into forecast (reduction identity)", "status": "pending", "blockedBy": [4, 5]},
+    {"id": 7, "subject": "Task 7: --channels three-model ablation, rung-a reproduced", "status": "pending", "blockedBy": [6]},
+    {"id": 8, "subject": "Task 8: Three-model scoring + marginal-value bootstrap", "status": "pending", "blockedBy": [7]},
+    {"id": 9, "subject": "Task 9: Figures, NOTES, RESULTS", "status": "pending", "blockedBy": [8]},
+    {"id": 10, "subject": "Task 10: Full run, gates, write-up, commit", "status": "pending", "blockedBy": [3, 8]}
+  ],
+  "lastUpdated": "2026-07-23"
+}
