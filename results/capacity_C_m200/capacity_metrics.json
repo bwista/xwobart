@@ -1,0 +1,64 @@
+{
+  "m_trees": 200,
+  "n_events": 122006,
+  "elpd": {
+    "v0_a": -75117.35733758536,
+    "v0_b": -75154.07374226411,
+    "spray": -72118.38849587069
+  },
+  "noise_floor_nats": 36.71640467875113,
+  "spray_minus_v0a": 2998.968841714668,
+  "spray_minus_v0b": 3035.685246393419,
+  "spray_minus_v0_mean": 3017.327044054051,
+  "holdout_order_digests": {
+    "v0_a": "35184af650b084b9",
+    "v0_b": "35184af650b084b9",
+    "spray": "35184af650b084b9"
+  },
+  "paired_valid": true,
+  "stage3_m50_reference": {
+    "v0_anchor": -80107.495,
+    "v0_replicate": -79840.4,
+    "spray": -79876.3,
+    "noise_floor": 267.1,
+    "m_trees": 50
+  },
+  "ece": {
+    "v0_a": 0.027735091327930384,
+    "v0_b": 0.026340470565917904,
+    "spray": 0.036868771978624655
+  },
+  "fit_minutes": {
+    "v0_a": 94.3,
+    "v0_b": 95.0,
+    "spray": 94.9
+  },
+  "unpaired_verdict": "BEATS v0 (gap exceeds the noise floor)",
+  "unpaired_beats": true,
+  "paired_vs_v0_a": {
+    "total_delta_nats": 2998.968841714683,
+    "mean_per_event": 0.02458050294013969,
+    "paired_se_nats": 61.43193750101726,
+    "ci95_nats": [
+      2877.318826496861,
+      3119.7742921440044
+    ],
+    "frac_events_better": 0.5764224710260151,
+    "n_events": 122006,
+    "direction": "better",
+    "significant": true
+  },
+  "paired_vs_v0_b": {
+    "total_delta_nats": 3035.6852463934324,
+    "mean_per_event": 0.024881442276555518,
+    "paired_se_nats": 61.68419019569939,
+    "ci95_nats": [
+      2912.838972626198,
+      3155.6438679770527
+    ],
+    "frac_events_better": 0.5756274281592708,
+    "n_events": 122006,
+    "direction": "better",
+    "significant": true
+  }
+}

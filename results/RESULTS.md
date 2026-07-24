@@ -443,26 +443,47 @@ claims: surface errors are **correlated across players in the same feature regio
 summing or averaging these intervals across players understates the true uncertainty. A
 league-level statement needs the per-draw refit variant, not these draws.
 
-### Next experiment — does spray help at matched capacity? (`scripts/capacity_experiment.py`)
+### Spray at matched capacity — the m=200 result (`scripts/capacity_experiment.py`)
 
-The capacity-dilution reading above is testable, and the script is written and smoke-tested
-end to end (not yet run at Stage C). It fits **three** models at the same enlarged tree
-budget and compares them to each other rather than to the frozen 3-feature anchor:
+**Run 2026-07-23 (`m_trees=200`, ~4.7 h, three fits over the full 122,006-event holdout).** The
+capacity-dilution reading above is **confirmed**: at a matched, adequate tree budget the 5-feature
+**spray surface decisively beats v0** — the Stage-3 "no improvement" was a capacity artifact, not
+missing signal. The experiment fits three models at the same enlarged budget and compares them to
+each other, not to the frozen 3-feature anchor:
+
+1. **v0 at the new capacity** — the fresh anchor (ELPD **−75,117.4**).
+2. **v0 again** — the replicate; its gap to (1) *measures* the noise floor at this capacity
+   (**36.7 nats**) rather than assuming Stage 3's 267 carries over.
+3. **spray at the new capacity** — the treatment (ELPD **−72,118.4**).
+
+| comparison | value |
+|---|---|
+| null noise floor \|v0_a − v0_b\| | **36.7 nats** |
+| spray − mean(v0), unpaired | **+3,017 nats** — 82× the floor → **BEATS** |
+| paired spray − v0(a) | **+2,999 nats**, 95% CI [+2,877, +3,120] (excludes 0) |
+| paired spray − v0(b) | **+3,036 nats**, 95% CI [+2,913, +3,156] (excludes 0) |
+| spray better on | **57.6%** of 122,006 events |
+| weighted ECE (v0_a / v0_b / spray) | 0.0277 / 0.0263 / **0.0369** |
+
+Holdout-order digests were identical across all three fits, so the paired test compares matched
+events. For scale: going m=50 → 200 lifted **both** models enormously (v0 +4,990 nats, spray +7,758)
+and collapsed the noise floor 267 → 37 — the m=50 fits were simply under-capacity for 122k events.
+Verdict artifact: `results/capacity_C_m200/capacity_metrics.json`.
+
+**Two caveats travel with the win.** (1) **Calibration regressed** — spray's weighted ECE 0.0369 vs
+the matched v0's ~0.027; it buys likelihood/sharpness at some cost to calibration (the same tension
+as Stage-3 E2). (2) **This is a *description* win, not a *forecast* win.** A follow-up pre-check
+(`results/talent3/NOTES.md` §"Rung b — spray peripheral") found a hitter's pull tendency is
+**forecast-redundant** for rest-of-season xwOBA once early EV/barrel are in — so the better surface
+does **not** translate into a better in-season forecast. Spray: **description-yes, forecast-no.**
+
+Reproduce (completed fits skip on re-run; each is ~90 min at `m_trees=200`, ~4 GB `idata.nc`, gitignored):
 
 ```bash
 .venv/bin/python scripts/capacity_experiment.py --dry-run        # print the plan
-.venv/bin/python scripts/capacity_experiment.py                  # m_trees=200, ~5.3 h
+.venv/bin/python scripts/capacity_experiment.py                  # m_trees=200, ~4.7 h
 .venv/bin/python scripts/capacity_experiment.py --analyze        # re-score existing fits
-.venv/bin/python scripts/capacity_experiment.py --stage A --m-trees 8   # ~1 min wiring smoke
 ```
-
-1. **v0 at the new capacity** — the fresh anchor.
-2. **v0 again** — the replicate, whose gap to (1) *measures* the noise floor at this
-   capacity rather than assuming Stage 3's 267 nats carries over.
-3. **spray at the new capacity** — the treatment.
-
-Completed fits are skipped on re-run, so an interruption costs one fit rather than the set
-(each is ~107 min at `m_trees=200`, and each writes ~4 GB of `idata.nc`).
 
 Two verdicts are reported. The **unpaired** one repeats Stage 3's logic against the new
 anchor and noise floor. The **paired** one is sharper and is why `run_v0.py` now persists
@@ -559,3 +580,51 @@ band holds within ±5pp everywhere. G4 is reported as a real, unresolved failure
 section is quoted without its paired-bootstrap CI, and the calibration miss is not spun into a
 pass. See `results/talent3/NOTES.md` for the full construction, the gate panel, the fan-chart
 product shot (`results/talent3/figures/fan_chart_examples.png`), and the honest limitations list.
+
+<!-- stage_C_m200a -->
+## Stage C_m200a
+- kit_sha: fcbb78a | seed: 42 | fit rows: 100000 | predict rows: {'train': 363595, 'holdout': 122006, 'capped': False}
+- coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
+- fit runtime: 94.3 min | total: 108.1 min
+- linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
+- volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
+- sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
+- replication r — event train 0.948, event holdout 0.949, player train 0.980, player holdout 0.982
+- calibration — weighted ECE 0.0277
+- ELPD (lppd) -75117.4 ± 248.2 over 122006 events
+- undercorrection corr — model 0.022 vs public 0.013
+- localization slopes (per ft/s) — grounder 0.0036, barrel 0.0043
+- sanity warnings: ['max R-hat on probed mu cells = 1.658 (> 1.1)']
+<!-- /stage_C_m200a -->
+
+<!-- stage_C_m200b -->
+## Stage C_m200b
+- kit_sha: fcbb78a | seed: 42 | fit rows: 100000 | predict rows: {'train': 363595, 'holdout': 122006, 'capped': False}
+- coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
+- fit runtime: 95.0 min | total: 107.9 min
+- linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
+- volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
+- sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
+- replication r — event train 0.953, event holdout 0.954, player train 0.982, player holdout 0.984
+- calibration — weighted ECE 0.0263
+- ELPD (lppd) -75154.1 ± 248.6 over 122006 events
+- undercorrection corr — model 0.023 vs public 0.013
+- localization slopes (per ft/s) — grounder 0.0036, barrel -0.0018
+- sanity warnings: ['max R-hat on probed mu cells = 1.828 (> 1.1)']
+<!-- /stage_C_m200b -->
+
+<!-- stage_C_spray_m200 -->
+## Stage C_spray_m200
+- kit_sha: fcbb78a | seed: 42 | fit rows: 100000 | predict rows: {'train': 363595, 'holdout': 122006, 'capped': False}
+- coverage gaps: ['2022: cache ends 2022-09-30, season ends 2022-10-05', '2023: cache ends 2023-09-30, season ends 2023-10-01']
+- fit runtime: 94.9 min | total: 108.6 min
+- linear weights: {'out': 0.0159, 'single': 0.9, 'double': 1.25, 'triple': 1.6, 'home_run': 2.0}
+- volumes/drops per season: train [{'game_year': 2022, 'n_bbe_raw': 120450, 'n_bunt': 1047, 'n_missing_ls_la': 512, 'pct_missing': 0.43}, {'game_year': 2023, 'n_bbe_raw': 123499, 'n_bunt': 1072, 'n_missing_ls_la': 357, 'pct_missing': 0.29}, {'game_year': 2024, 'n_bbe_raw': 124160, 'n_bunt': 1156, 'n_missing_ls_la': 370, 'pct_missing': 0.3}]; holdout [{'game_year': 2025, 'n_bbe_raw': 124789, 'n_bunt': 1227, 'n_missing_ls_la': 1556, 'pct_missing': 1.26}]
+- sprint imputation rates: train [{'game_year': 2022, 'imputation_rate': 0.006308299198425449}, {'game_year': 2023, 'imputation_rate': 0.0046202998279675596}, {'game_year': 2024, 'imputation_rate': 0.00581404830634245}]; holdout [{'game_year': 2025, 'imputation_rate': 0.00581118961362556}]
+- replication r — event train 0.907, event holdout 0.909, player train 0.956, player holdout 0.957
+- calibration — weighted ECE 0.0369
+- ELPD (lppd) -72118.4 ± 233.5 over 122006 events
+- undercorrection corr — model 0.032 vs public 0.013
+- localization slopes (per ft/s) — grounder 0.0016, barrel 0.0033
+- sanity warnings: ['max R-hat on probed mu cells = 1.827 (> 1.1)']
+<!-- /stage_C_spray_m200 -->
