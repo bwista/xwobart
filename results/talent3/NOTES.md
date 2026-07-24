@@ -177,7 +177,63 @@ panel is the G4 finding made visible in a single picture, not hidden by it.
   (xwOBA, avg EV, barrel rate), so the peripheral-informed measurement feeds the hierarchy
   instead of a bare xwOBA read. Low-PA sharpening; the double-shrinkage composition (peripheral
   shrink at the measurement layer, career shrink at the hierarchy layer) is open implementation
-  detail per spec §4.2.
+  detail per spec §4.2. **Update (2026-07-23): the spray/pull variant of this rung was pre-checked
+  and rejected — see "Rung b — spray peripheral: a documented negative" below. The EV/barrel-only
+  version remains untested.**
 - **Rung (c): aging + AR(1) drift.** A shared aging curve `g(age; β)` (needs external
   birthdates) and `u_{i,t} = ρ·u_{i,t−1} + e` so last season informs this one beyond the career
   mean. Second-order gains on top of (a) and (b).
+
+## Rung b — spray peripheral: a documented negative (2026-07-23)
+
+Design: `docs/superpowers/specs/2026-07-23-xwobart-forecast-rungb-spray-peripheral-design.md` ·
+Plan: `docs/superpowers/plans/2026-07-23-forecast-rungb-spray.md`. Reproduce:
+`.venv/bin/python scripts/run_talent3.py --precheck` → `results/talent3/precheck_pull.json`.
+
+**The question.** A separate surface experiment (`results/capacity_C_m200/`, `m_trees=200`) settled a
+long-open thread by showing the 5-feature **spray** BART surface decisively beats the 3-feature v0
+surface — **+3,017 nats** paired vs a **37-nat** run-to-run noise floor — i.e. spray genuinely
+improves how the model *values a batted ball*. The obvious next question for this forecaster: does
+that carry over to the **product** — does a hitter's early-season **pull tendency** sharpen the
+rest-of-season xwOBA forecast? Spray isn't in Savant's xwOBA, and pull tendency stabilizes fast, so it
+*could* be exactly the low-PA lever rung (a)'s calibration miss (limitation 8) is asking for.
+
+**A pre-check before a model.** Rather than build the full 4-channel joint-MVN measurement first, we
+asked the cheap version directly (spec §5): per eligible (batter, season, *k*), does early-*k* mean
+pull add incremental linear signal for the realized rest-of-season xwOBA rate *beyond* early-*k*
+xwOBA + avg EV + barrel rate? Two OLS fits, incremental R² by PA-seen band — seconds, no model. The
+partial correlation it measures is precisely the talent-covariance borrow the joint-MVN rung would
+exploit, so a null here is a faithful null for the full rung.
+
+**Verdict: STOP.** Incremental R² of adding pull, by cutpoint:
+
+| k | n | R²(xwoba,ev,barrel) | +pull | ΔR² | partial r |
+|---|---|---|---|---|---|
+| 50 | 1,945 | 0.169 | 0.172 | **+0.00215** | −0.051 |
+| 100 | 1,692 | 0.224 | 0.226 | +0.00207 | −0.052 |
+| 150 | 1,498 | 0.263 | 0.263 | +0.00004 | +0.008 |
+| 200 | 1,326 | 0.285 | 0.287 | +0.00128 | +0.042 |
+| 300 | 1,032 | 0.307 | 0.307 | +0.00008 | +0.011 |
+
+ΔR² tops out at **+0.0022** (k=50) against a 0.01 go bar — ~5× below threshold at its best, and below
+even a 0.005 "irrelevant" line at every cutpoint. This is a **well-powered** null, not an underpowered
+shrug: at the real k=50 sample (n=1,945) a deliberately injected weak effect of ΔR²≈0.04 clears the
+bar easily, so a real effect would have shown; the result is unchanged with season fixed effects +
+pull×season interactions (ruling out the 2023 shift-ban or league drift masking it); and `pull` is a
+genuine, fully-populated, varying feature at every band (not degenerate). Feature assembly is
+leakage-safe — early features are strictly the first-*k* game-date-sorted PAs, target is the realized
+remainder (independently re-derived and reproduced byte-for-byte in review).
+
+**Reading.** Spray improves ball *description* but is **forecast-redundant**: a hitter's pull tendency
+carries almost no information about his future xwOBA once his early exit velocity and barrel rate —
+the same power skill, stabilizing just as fast — are already in the model. For the in-season
+forecasting product, spray is a dead lever. This closes the spray thread that ran from Phase-2 Stage 3
+(spray failed at `m_trees=50`, a capacity artifact) through the m=200 surface win (description) to here
+(forecasting): a coherent **description-yes / forecast-no**.
+
+**What this leaves.** The pre-check plumbing is committed and reusable — `build_pa_frame` now carries
+`ev`/`barrel`/`pull` per PA, `bootstrap_S` takes an optional 4th (pull) channel, and `src/precheck.py`
+is a general incremental-signal gate. The 4-channel forecast model itself was **not** built; the
+pre-check made it moot. The EV/barrel-only version of rung (b) — peripheral sharpening *without* spray
+— remains a separate, untested lever (the pre-check controlled *for* EV/barrel, so it says nothing
+about whether they help as measurement peripherals over an xwOBA-only read).
