@@ -27,40 +27,48 @@ in the prose still match the artifacts under `results/` — if a pipeline re-run
 result, re-executing the notebook fails loudly at the guard instead of letting the text
 silently drift.
 
-## The notebooks (read in order)
+## The three parts (read in order)
 
-| # | Notebook | What it shows | Reads |
-|---|----------|---------------|-------|
-| 01 | `01_v0_model_quality.ipynb` | The v0 BART model reproduces Savant xwOBA at player-r ≈ 0.96; calibration, sprint signal, feature importance; quality saturates by ~50k rows | `results/stage_{A,B,C}/` |
-| 02 | `02_accuracy_vs_savant.ipynb` | Is v0 *more accurate* than Savant at predicting next-season wOBA? → **statistical parity** (r 0.481 vs 0.487), both beat naive | `results/benchmark/` |
-| 03 | `03_uncertainty_bands.ipynb` | v0's model interval is **flat in PA** (wrong object); a **bootstrap over a player's PAs** narrows correctly with sample size | `results/task_a/`, `results/player_ci/` |
-| 04 | `04_talent_estimates.ipynb` | **Phase 1 empirical-Bayes true-talent xwOBA** — shrinkage, reliability, examples, and the next-season validation (beats raw; ties Savant, beats it at low PA) | `results/talent/` |
-| 05 | `05_level2_talent.ipynb` | **Phase 2 / Stage 1** — shrink toward what the *contact* implies (joint MVN over xwOBA + exit velo + barrel rate) instead of the league mean; gain concentrated at low PA (+0.072 at 30–60), the shared-noise tripwire, and why the win isn't statistically established | `results/talent2/` |
-| 06 | `06_spray_surface.ipynb` | **Spray surface — a documented negative** — do spray direction + handedness beat the parity wall? Measured against the sampler's own ~267-nat run-to-run noise floor, the 5-feature refit buys no held-out likelihood (calibration worsens, replication drops) even though the model *learns* spray (importance #3, a pulled-air HR gradient); spray-conditioned rollups also lose to marginalized, and both lose to v0 | `results/stage2_rebuild/`, `results/stage_C_spray/`, `results/rollup_ab/` |
-| 07 | `07_ros_forecast.ipynb` | **Rest-of-season forecast** — stand at a hitter's first *k* PAs and forecast his final full-season xwOBA with a calibrated range, adding a **career random intercept** over his prior seasons. Beats naive, Marcel and single-season Level 2 (bootstrap CIs exclude 0); G5 reduces to Phase 1 exactly, but the 50%/80% intervals run narrow — a real, open calibration failure | `results/talent3/` |
+The series is organised by **finding**, not by the chronology of the work — each part opens
+by answering the question the previous one raised and closes by raising the next.
 
-## The arc in one paragraph
+| # | Notebook | The finding it delivers | Reads |
+|---|----------|-------------------------|-------|
+| 01 | `01_surface_and_ceiling.ipynb` | v0 replicates Savant (player r **0.956**) but sits at its **information ceiling for prediction** (next-season parity, r 0.481 vs 0.487). Spray — the information Savant lacks — genuinely improves *description* at adequate capacity (m=200: **+3,017 nats** paired vs a **37-nat** noise floor, reversing the m=50 negative as capacity dilution), yet does **not** breach the prediction wall (spray rollups still lose to v0) and calibration regresses under it. | `results/stage_{A,B,C}/`, `results/benchmark/`, `results/stage2_rebuild/`, `results/stage_C_spray/`, `results/capacity_C_m200/`, `results/stage_C_{m200a,spray_m200}/`, `results/rollup_ab/` |
+| 02 | `02_uncertainty_and_talent.ipynb` | v0's posterior band is the **wrong object** (flat in PA); a PA-bootstrap narrows correctly and the two cross near 450–600 PA. Empirical-Bayes shrinkage turns that into a true-talent estimate that beats raw everywhere and edges Savant once low-PA seasons are admitted (**0.467 vs 0.452**). Level 2 puts the fast-stabilizing peripherals in the prior: **+0.072 r at 30–60 PA**, ~nothing at 250+, pooled effect small and one holdout season disagrees — with the shared-noise tripwire coming back clean. | `results/task_a/`, `results/player_ci/`, `results/talent/`, `results/talent2/` |
+| 03 | `03_forecast.ipynb` | From a hitter's first *k* PAs, forecast his final-season xwOBA with a range. Pooled RMSE **0.0220** beats naive / Marcel / single-season Level 2 (bootstrap CIs exclude 0); G5 reduces to Phase 1 exactly (**5.6e-17**); **G4 calibration fails** — 50/80% intervals run narrow, worst at short runway. And **spray adds nothing here**: pull tendency is forecast-redundant (**ΔR² ≤ +0.0022** beyond early xwOBA/EV/barrel). | `results/talent3/` |
 
-v0 is a faithful, well-calibrated xwOBA model (01) — but it's at Savant's accuracy ceiling
-with three features (02). The project then pivoted from accuracy to **uncertainty**: v0's
-posterior band doesn't shrink with sample size, but a PA-bootstrap does (03). Phase 1 puts
-those together into a **sample-size-regressed true-talent estimate** with a calibrated
-interval, which beats the raw number and edges Savant for low-PA hitters (04). Phase 2 then
-fixes the last weakness — that everyone regresses toward the *league* mean — by putting the
-fast-stabilizing peripherals (exit velo, barrel rate) into the prior, so a rookie barreling
-the ball regresses toward a slugger (05). That help lands exactly where the sample is thin
-(+0.072 r at 30–60 PA, nothing at 250+) and the tripwire for the obvious failure mode came
-back clean — though the pooled effect is small and one holdout season disagrees.
+## The arc in three paragraphs
 
-Then two more arcs, both honest about their limits. **06** finally cashes in the promise from
-02 — feed the surface the inputs Savant lacks, spray direction and handedness — and it's a
-negative told properly: measured against the sampler's own run-to-run noise floor, a 5-feature
-BART refit buys no held-out accuracy even though it demonstrably learns spray, so the parity
-wall still stands. **07** changes the question from describing a season to forecasting one —
-from a hitter's first *k* PAs, predict his final xwOBA with a range that tightens as the season
-plays out, adding a career random intercept over his prior seasons; it beats Marcel and
-single-season Level 2 with bootstrap CIs that exclude zero, while its 50%/80% intervals run
-narrow, a documented and still-open calibration miss.
+**01 — The surface and its ceiling.** v0 is a faithful, well-calibrated reconstruction of
+xwOBA from three contact features (player r 0.956, weighted ECE 0.042), but at those three
+features it sits *exactly* at public Savant's ceiling for predicting next-season actual wOBA
+(r 0.481 vs 0.487, parity). The one honest way past that ceiling is to feed the surface what
+Savant throws away — where the ball was hit, and which hand hit it. Doing so is a real *description*
+win, but only once the tree budget is large enough to use it: at m=50 spray looked like a
+negative (inside a 267-nat run-to-run noise floor), and it took re-measuring that noise floor at
+matched m=200 capacity to reveal a **+3,017-nat** improvement against a 37-nat floor. That better
+surface still doesn't predict a hitter's next season any better, and its calibration is worse —
+description-yes, prediction-no.
+
+**02 — Uncertainty and true talent.** If the point estimate is capped, the value is in the *band*
+and the *center*. v0's posterior band is flat in PA — it measures surface uncertainty, not sample
+size — while a bootstrap over a player's own PAs gives an honest band that narrows correctly, the
+two crossing near 450–600 PA. Empirical-Bayes shrinkage turns that into a sample-size-honest
+true-talent estimate that beats the raw number everywhere and edges Savant for low-PA hitters
+(0.467 vs 0.452). Level 2 then replaces the flat league-mean prior with what a hitter's *contact
+quality* implies, so a rookie barreling the ball regresses toward a slugger; the help lands exactly
+where the sample is thin (+0.072 r at 30–60 PA, nothing at 250+), the pooled effect is small, one
+holdout season disagrees, and the tripwire for the obvious artifact came back clean and decisive.
+
+**03 — The product: forecasting the rest of a season.** The first two parts describe seasons that
+already happened; this one forecasts one in progress. Standing at a hitter's first *k* PAs it
+forecasts his final full-season xwOBA with a calibrated range, adding a career random intercept
+over his prior seasons — and beats naive, Marcel and single-season Level 2 with bootstrap CIs that
+exclude zero (pooled RMSE 0.0220). G5 reduces to Phase 1 exactly; G4 is an honest, open failure —
+the 50/80% intervals run narrow, worst when little season is left. And a well-powered pre-check
+closes the spray thread for good: a hitter's pull tendency is forecast-redundant once his early
+exit velocity and barrel rate are in the model.
 
 Note the design that *didn't* survive: shrinking toward the BART model's own xwOBA was a
 structural no-op (the surface is built from the same batted balls as the raw number), so the

@@ -34,18 +34,24 @@ and the rest-of-season forecast beats Marcel with a CI that excludes zero.
    **+0.072 r at 30–60 PA**, zero at 250+ — while the pooled effect is small and one
    holdout season disagrees; a shared-noise tripwire proves the gain is not a
    same-sample artifact. (`results/talent2/`)
-6. **Spray surface — a documented negative.** Caches rebuilt with hit coordinates,
-   `spray_pull` + `stand_R` added, refit at strict protocol parity: **no improvement**.
-   The apparent +231-nat ELPD gain sits inside the *measured* 267-nat run-to-run
-   sampler noise floor, calibration worsened, and spray-conditioned rollups reliably
-   lose to spray-marginalized ones (both lose to v0). Follow-up written but not yet
-   run: `scripts/capacity_experiment.py` — does spray pay at a matched, larger tree
-   budget? (`results/stage2_rebuild/`, `results/stage_C_spray/`, `results/rollup_ab/`)
+6. **Spray surface — description-yes, prediction-no.** Caches rebuilt with hit
+   coordinates, `spray_pull` + `stand_R` added. At the frozen m=50 budget the 5-feature
+   refit looked like a negative — the apparent +231-nat gain sat inside the *measured*
+   267-nat run-to-run noise floor. That was **capacity dilution**, now confirmed: at a
+   matched m=200 budget (`scripts/capacity_experiment.py`, ~4.7 h) spray **decisively
+   beats** v0 for *description* — **+3,017 nats** paired against a **37-nat** noise floor,
+   82× the floor — so where the ball is hit genuinely improves how the model values a
+   batted ball. But it does **not** breach the prediction wall (spray-conditioned rollups
+   still lose to v0), and calibration regresses (ECE 0.0369 vs 0.0277).
+   (`results/capacity_C_m200/`, `results/stage_C_{m200a,m200b,spray_m200}/`,
+   `results/stage2_rebuild/`, `results/stage_C_spray/`, `results/rollup_ab/`)
 7. **Rest-of-season forecast (talent3, rung a).** Stand at a hitter's first *k* PAs and
    forecast his final-season xwOBA, adding a career random intercept over Phase 1.
    Pooled RMSE **0.0220** beats Marcel (0.0227) and single-season Level 2 (0.0245),
    both with paired-bootstrap CIs excluding zero; the 50%/80% interval coverage runs
-   narrow — a real, open failure. (`results/talent3/`)
+   narrow — a real, open failure (G4). Spray is a **dead lever here**: a hitter's pull
+   tendency is forecast-redundant (ΔR² ≤ +0.0022) once early EV/barrel are in.
+   (`results/talent3/`)
 
 `results/RESULTS.md` is the full ledger — every stage's metrics, gate outcomes,
 deviations, and the sampler-reproducibility measurement that bounds all surface
@@ -80,10 +86,14 @@ unmoved by a BART refit.
 
 ## The notebooks
 
-`notebooks/01–07` are the readable walk-through of all seven arcs above, committed **with
-outputs embedded** so everything is viewable on GitHub without running anything. Each
-ends with a guard cell that asserts the prose's numbers against the artifacts. See
-`notebooks/README.md` for the reading order.
+`notebooks/01–03` are the readable walk-through, committed **with outputs embedded** so
+everything is viewable on GitHub without running anything. They are organised by **finding**,
+not by the chronology of the work: **01 — the surface and its ceiling** (v0's Savant-parity
+wall, and spray winning description at matched capacity but not prediction), **02 — uncertainty
+and true talent** (the honest sample-size band, empirical-Bayes talent, the peripheral-informed
+prior), and **03 — the product** (the rest-of-season forecast, and the spray dead-end for
+forecasting). Each ends with a guard cell that asserts the prose's numbers against the
+artifacts. See `notebooks/README.md` for the reading order and the per-part arc.
 
 ## Setup
 
